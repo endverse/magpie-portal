@@ -35,6 +35,18 @@ func (id Identity) InGroup(group string) bool {
 	return false
 }
 
+// The portal's built-in roles, held as groups in the identity's claim.
+// Their names are fixed here, not in the config: whoever Keycloak says
+// holds one, does.
+const (
+	RoleSuper    = "magpie-super"    // everything, bodies included
+	RoleOperator = "magpie-operator" // the console's operations, no bodies
+)
+
+// HasRole says whether the identity holds the named built-in role, by the
+// same reading InGroup uses (the provider's spelling, or slashless).
+func (id Identity) HasRole(role string) bool { return id.InGroup(role) }
+
 // OIDCProvider is the part of an OpenID Connect provider the portal uses: a
 // login URL to send someone to, and the identity their code comes back as.
 // The portal's tests give it a fake; NewProvider gives it the real one.

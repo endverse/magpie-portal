@@ -165,3 +165,20 @@ func TestProviderExchange(t *testing.T) {
 		t.Fatal("accepted an id token for another login")
 	}
 }
+
+func TestIdentityRoles(t *testing.T) {
+	id := Identity{Subject: "s", Groups: []string{"magpie-super", "/magpie-operator", "team-a"}}
+	if !id.HasRole("magpie-super") {
+		t.Fatal("magpie-super not seen")
+	}
+	if !id.HasRole("magpie-operator") {
+		t.Fatal("magpie-operator not seen behind its leading slash")
+	}
+	if id.HasRole("magpie-none") {
+		t.Fatal("an unheld role says held")
+	}
+	plain := Identity{Subject: "s", Groups: []string{"team-a"}}
+	if plain.HasRole("magpie-super") || plain.HasRole("magpie-operator") {
+		t.Fatal("a plain person reads as a role holder")
+	}
+}
