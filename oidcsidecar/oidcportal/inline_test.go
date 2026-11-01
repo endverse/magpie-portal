@@ -252,17 +252,12 @@ want({ admin: true, super: false }, "oidc-operator");
 want({}, "oidc-person");
 `
 
-// adminRunner is node's page for consolepage.go's adminPre: magpie's
-// sidebar with #nav holding every view's button and the page opened on
-// Agents; and the page's first script (consoleboot.go's roleScript), run
-// afterwards, as /boot.js runs it before the page's own. After them, the
-// Work views are out of the nav, the console's stay, the document says
-// whose console it is, and the admin is on Providers, not Agents.
-// adminRunner is node's page for consolepage.go's adminPre: magpie's
-// sidebar with #nav holding every view's button; and the page's first
-// script (consoleboot.go's roleScript), run afterwards, as /boot.js runs it
-// before the page's own. After them, the Work views are out of the nav, the
-// console's stay, and the document says whose console it is.
+// adminRunner is node's page for consolepage.go's adminPre, run twice: the
+// page as it comes up, and one an admin clicks Routing on the turn before
+// the script's own timer runs. After the first, the Work views are out of
+// the nav, the console's stay, the document says whose console it is, and
+// the admin is on Providers, not Agents; after the second, the click is
+// theirs.
 const adminRunner = `
 const src = require("fs").readFileSync(0, "utf8");
 let id = 0;
@@ -290,72 +285,83 @@ const mk = (tag) => {
   Object.defineProperty(n, "childNodes", { get() { return n.children } });
   return n;
 };
-const body = mk("body");
-const side = body.appendChild(mk("div"));
-side.className = "side-scroll";
-const nav = side.appendChild(mk("nav"));
-nav.id = "nav";
-const views = ["agents", "sessions", "library", "providers", "routing", "gateway", "usage", "masking", "plugins"];
-// the page's views: Agents drawn and its button the one on, the rest hidden
-// (the page's show draws one); its Work views in the nav, pruned or not
-const pageViews = {};
-views.forEach((v) => { const b = nav.appendChild(mk("button")); b.dataset.view = v;
-  if (v === "agents") b.classList.add("on");
-  const m = body.appendChild(mk("main")); m.id = "view-" + v; m.className = "view"; m.hidden = v !== "agents"; pageViews[v] = m });
-const foot = body.appendChild(mk("div")); foot.className = "side-foot";
-const els = { "#nav": nav, ".side-scroll": side, ".side-foot": foot };
-for (const v of views) els["#view-" + v] = pageViews[v];
-const doc = { readyState: "complete", documentElement: mk("html"), ready: [], getElementById: (id) => els["#" + id] || null,
-  querySelector: (s) => els[s] || null, querySelectorAll: (sel) => body.querySelectorAll(sel), createElement: mk, body, title: "",
-  addEventListener(t, f) { if (t === "DOMContentLoaded") this.ready.push(f) } };
-globalThis.document = doc;
-globalThis.t = (s) => s;
-// the page's own show: draws the view's page, and makes its button the one
-// on (the page's own Agents if it has no page of that name), and says which
-const shown = [];
-globalThis.show = (v) => { const at = views.includes(v) ? v : "agents"; shown.push(at);
-  views.forEach((w) => { pageViews[w].hidden = w !== at; const b = nav.querySelector('button[data-view="' + w + '"]'); if (b) b.classList.toggle("on", w === at) });
-  return true; };
-globalThis.I18N = { zh: {} };
-globalThis.location = { pathname: "/", search: "" };
-const timers = [];
-globalThis.MutationObserver = class { observe() {} };
-globalThis.setInterval = () => 0;
-globalThis.setTimeout = (f) => { timers.push(f); return 0 };
-globalThis.window = { addEventListener() {} };
-globalThis.window.oidcPerson = { email: "boss@example.com", admin: true, super: false };
-// the document says whose console it is before the page draws it: the
-// class stands for the role until consoleboot.go's roleScript writes it
-const load = doc.ready.slice();
-doc.ready = [];
-doc.documentElement.className = "oidc-operator";
-// the page calls its show for the view it opens, where this script does,
-// on the same turn: after the script's first look, before its next turn
-const turn = timers.splice(0);
-new Function(src)();
-if (timers.length === 0) throw new Error("the page draws no view of its own?");
-show("agents");
-turn.forEach((f) => f());
-doc.ready.push(...load);
-doc.ready.forEach((f) => f());
-timers.splice(0).forEach((f) => f());
-const left = nav.children.filter((c) => c.tag === "button" && c.dataset.view).map((b) => b.dataset.view).join(",");
-if (left !== "providers,routing,gateway,usage,masking,plugins") throw new Error("an operator's nav: " + left);
-const roles = doc.documentElement.className.split(" ").filter((c) => c.startsWith("oidc-") && c !== "oidc-pruned");
-if (roles.join(",") !== "oidc-operator") throw new Error("the document's class: " + JSON.stringify(doc.documentElement.className));
+// the timers as the page sets them, one queue, a page at a time
+let timers = null;
+globalThis.setTimeout = (f) => (timers && timers.push(f), 0);
+const run = new Function(src);
+// page is the page as it comes up, with click made before the script's
+// first look if click is true; it returns the page's state once its timers
+// have run in the order it set them, as a page draws them
+const page = (click) => {
+  const body = mk("body");
+  const side = body.appendChild(mk("div"));
+  side.className = "side-scroll";
+  const nav = side.appendChild(mk("nav"));
+  nav.id = "nav";
+  const views = ["agents", "sessions", "library", "providers", "routing", "gateway", "usage", "masking", "plugins"];
+  // the page's views: Agents drawn and its button the one on, the rest hidden
+  // (the page's show draws one); its Work views in the nav, pruned or not
+  const pageViews = {};
+  views.forEach((v) => { const b = nav.appendChild(mk("button")); b.dataset.view = v;
+    if (v === "agents") b.classList.add("on");
+    const m = body.appendChild(mk("main")); m.id = "view-" + v; m.className = "view"; m.hidden = v !== "agents"; pageViews[v] = m });
+  const foot = body.appendChild(mk("div")); foot.className = "side-foot";
+  const els = { "#nav": nav, ".side-scroll": side, ".side-foot": foot };
+  for (const v of views) els["#view-" + v] = pageViews[v];
+  const doc = { readyState: "complete", documentElement: mk("html"), ready: [], getElementById: (id) => els["#" + id] || null,
+    querySelector: (s) => els[s] || null, querySelectorAll: (sel) => body.querySelectorAll(sel), createElement: mk, body, title: "",
+    addEventListener(t, f) { if (t === "DOMContentLoaded") this.ready.push(f) } };
+  globalThis.document = doc;
+  globalThis.t = (s) => s;
+  // the page's own show: draws the view's page, makes its button the one on
+  // (the page's own Agents if it has no page of that name), and says which
+  const shown = [];
+  globalThis.show = (v) => { const at = views.includes(v) ? v : "agents"; shown.push(at);
+    views.forEach((w) => { pageViews[w].hidden = w !== at; const b = nav.querySelector('button[data-view="' + w + '"]'); if (b) b.classList.toggle("on", w === at) });
+    return true; };
+  globalThis.I18N = { zh: {} };
+  globalThis.location = { pathname: "/", search: "" };
+  globalThis.MutationObserver = class { observe() {} };
+  globalThis.setInterval = () => 0;
+  globalThis.window = { addEventListener() {} };
+  globalThis.window.oidcPerson = { email: "boss@example.com", admin: true, super: false };
+  doc.documentElement.className = "oidc-operator";
+  // the page loads: its timer set as its script runs, its handlers (the
+  // script's own and roleScript's), and its call to show for Agents, all on
+  // the same turn; the script's first look is the turn after
+  timers = [];
+  globalThis.location = { pathname: "/", search: "", addEventListener(t, f) { if (t === "DOMContentLoaded") doc.ready.push(f) } };
+  run();
+  const load = doc.ready.slice();
+  doc.ready = [];
+  doc.ready.push(...load);
+  doc.ready.forEach((f) => f());
+  show("agents");
+  // the admin's click on another view, before the script's first look: it
+  // shows, after the page's own call for Agents
+  if (click) show("routing");
+  // then the turns: each timer set so far, in the order it was set, a
+  // show() from one after those it set
+  let at = 0;
+  while (timers.length && at++ < 400) timers.shift()();
+  return { doc, nav, pageViews, shown };
+};
+const report = (r) => {
+  const { doc, nav, pageViews, shown } = r;
+  const left = nav.children.filter((c) => c.tag === "button" && c.dataset.view).map((b) => b.dataset.view).join(",");
+  if (left !== "providers,routing,gateway,usage,masking,plugins") throw new Error("an operator's nav: " + left);
+  const roles = doc.documentElement.className.split(" ").filter((c) => c.startsWith("oidc-") && c !== "oidc-pruned");
+  if (roles.join(",") !== "oidc-operator") throw new Error("the document's class: " + JSON.stringify(doc.documentElement.className));
+  return { view: shown[shown.length - 1], agents: pageViews.agents, providers: pageViews.providers,
+    on: (w) => { const b = nav.querySelector('button[data-view="' + w + '"]'); return !!b && b.classList.contains("on") } };
+};
 // the page opened its Agents, which an admin has not: the admin was steered
 // to Providers, its page drawn, its button the one on
-if (!pageViews.agents.hidden || pageViews.providers.hidden) throw new Error("the page's Agents is still drawn");
-if (!nav.querySelector('button[data-view="providers"]').classList.contains("on")) throw new Error("Providers is not the view on");
-if (shown[shown.length - 1] !== "providers") throw new Error("the admin was left on the page's: show(" + shown.join(",") + ")");
-// the page's own call after it, on the same turn, is the last word: the
-// steer is not run over it again
-show("routing");
-timers.splice(0).forEach((f) => f());
-if (shown.slice(-1).join() !== "routing") throw new Error("the page's own view, steered over: show(" + shown.join(",") + ")");
-show("gone");
-if (shown.slice(-1).join() !== "agents") throw new Error("the page's own Agents, steered over: show(" + shown.join(",") + ")");
-const before = shown.length;
-timers.splice(0).forEach((f) => f());
-if (shown.length !== before) throw new Error("the steer runs on: show(" + shown.join(",") + ")");
+const r = report(page(false));
+if (!r.agents.hidden || r.providers.hidden) throw new Error("the page's Agents is still drawn");
+if (!r.on("providers") || r.view !== "providers") throw new Error("the admin is not on Providers: " + r.view);
+// and one whose admin clicked Routing before the script's first look: the
+// steer waits a turn for the page's own call, and never takes that
+const c = report(page(true));
+if (!c.agents.hidden || c.view !== "routing" || !c.on("routing")) throw new Error("the admin's click was steered over: " + c.view);
 `

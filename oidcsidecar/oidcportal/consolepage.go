@@ -238,30 +238,31 @@ function add(){
   d.style.cssText="padding:6px 10px;font-size:11px;color:var(--muted,#8a8a8e);overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
   d.textContent=window.oidcPerson.email;foot.appendChild(d);}}
 
-// the page opens on Agents, which is not this deployment's. Once the page
-// has drawn it, the admin is steered to Providers, the one view they open:
-// its page shown, its sidebar's button the one on, as the page draws a
-// view; then the page's own show, which is how Providers loads, a turn on
-// (the page calls show for its Agents after this one on this turn). A click
-// of the admin's after, one after the turn this runs on, is theirs: this
-// does not run over it
-var stopped=false, waiting=false, n=0;
+// the page opens on Agents, a view no admin has (prune). The page's own
+// show("agents") runs after this script on the same turn, so ours waits a
+// turn: it draws Providers, its button the one on, then calls the page's
+// show, which is how Providers loads. That is the steer, once; the admin's
+// from there on. A page the script finds off Agents when it looks is the
+// admin's already (a click), and is not steered over
+var steered=false, n=0;
+function on(){var a=document.getElementById("view-agents"),b=document.querySelector('#nav button[data-view="agents"]');
+ return !a||!a.hidden||!!(b&&b.classList.contains("on"))}
 function steer(){
- var v=document.getElementById("view-providers"), a=document.getElementById("view-agents");
- if(!v||!a)return false;
- waiting=true;n=0;
- document.querySelectorAll("main.view").forEach(function(m){m.hidden=m!==v});
- var b=document.querySelector('#nav button[data-view="providers"]'),ba=document.querySelector('#nav button[data-view="agents"]');
- if(b&&ba){b.classList.add("on");b.setAttribute("aria-current","page");ba.classList.remove("on");ba.removeAttribute("aria-current")}
+ var v=document.getElementById("view-providers");
+ if(!v||!document.getElementById("view-agents"))return false;
+ steered=true;
  setTimeout(function(){
-  if(typeof show==="function"&&!document.getElementById("view-agents").hidden){try{show("providers")}catch(e){}}
-  setTimeout(function(){if(document.getElementById("view-providers").hidden)stopped=true},50);
+  document.querySelectorAll("main.view").forEach(function(m){m.hidden=m!==v});
+  var b=document.querySelector('#nav button[data-view="providers"]'),ba=document.querySelector('#nav button[data-view="agents"]');
+  if(b&&ba){b.classList.add("on");b.setAttribute("aria-current","page");ba.classList.remove("on");ba.removeAttribute("aria-current")}
+  setTimeout(function(){if(typeof show==="function"){try{show("providers")}catch(e){}}},0);
  },0);
  return true;}
 function poll(){try{add()}catch(e){}
- if(stopped)return;
- if(!waiting)steer();
- if(n++<400)setTimeout(poll,50);}
+ setTimeout(function(){
+  if(!steered&&on())steer();
+  if(!steered&&n++<400)setTimeout(poll,50);
+ },0);}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",poll);else poll();})();</script>`)
 }
 
