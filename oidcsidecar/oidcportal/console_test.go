@@ -468,7 +468,8 @@ func TestConsoleAllowedByRole(t *testing.T) {
 }
 
 // A super admin whose policy an admin rejected is still let into the
-// console: the console gate reads the role, not the policy. ROUTE TO
+// console and its admin page: the gates read the role, which is Keycloak's,
+// not the policy, which keeps them unadopted and without a key. ROUTE TO
 // OWNER: the policy is the wrong place for this assertion.
 func TestRejectedSuperAdminIsNotAdopted(t *testing.T) {
 	up := newConsoleUpstream(t)
@@ -492,5 +493,10 @@ func TestRejectedSuperAdminIsNotAdopted(t *testing.T) {
 	}
 	if resp, body := doConsole(t, c, http.MethodGet, ts.URL+"/api/state"); resp.StatusCode != http.StatusOK {
 		t.Fatalf("/api/state = %d %s, want the role's 200", resp.StatusCode, body)
+	}
+	// the admin page answers them too: the role is Keycloak's, not the
+	// policy's, and the page lists the request it was refused in
+	if resp, body := doConsole(t, c, http.MethodGet, ts.URL+"/admin"); resp.StatusCode != http.StatusOK || !strings.Contains(string(body), "root@example.com") {
+		t.Fatalf("/admin = %d, want the role's 200: %s", resp.StatusCode, body)
 	}
 }

@@ -372,6 +372,37 @@ func TestAdminSeesUsersAndOnlyAdminsSeeThePage(t *testing.T) {
 	}
 }
 
+// The admin page is an operator's too: the role makes them an admin, and
+// the page reads no more than any admin's. A regression pin, since the
+// page predates the operator role.
+func TestAdminPageAnswersAnOperator(t *testing.T) {
+	cfg := serverConfig(t)
+	fp := &fakeProvider{id: Identity{Subject: "boss", Email: "boss@example.com", Groups: []string{"team-c", RoleOperator}}}
+	ts, state, c := newTestServer(t, cfg, fp)
+	if _, err := NewProvisioner(cfg, state).EnsureUser(alice()); err != nil {
+		t.Fatal(err)
+	}
+	signIn(t, ts, c, fp, "/admin")
+
+	resp, err := c.Get(ts.URL + "/admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := bodyOf(t, resp)
+	if resp.StatusCode != http.StatusOK || !strings.Contains(body, "门户管理") || !strings.Contains(body, "alice@example.com") {
+		t.Fatalf("the admin page: %d %s", resp.StatusCode, body)
+	}
+	// and one page of it, the person's: key and usage, which any admin reads
+	resp, err = c.Get(ts.URL + "/admin/user?sub=alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body = bodyOf(t, resp)
+	if resp.StatusCode != http.StatusOK || !strings.Contains(body, "alice@example.com") {
+		t.Fatalf("an operator's page of a person: %d %s", resp.StatusCode, body)
+	}
+}
+
 func TestANonAdminIsRefusedTheAdminPage(t *testing.T) {
 	cfg := serverConfig(t)
 	fp := &fakeProvider{id: Identity{Subject: "alice", Email: "alice@example.com", Groups: []string{"team-a"}}}

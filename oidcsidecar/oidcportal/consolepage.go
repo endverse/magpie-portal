@@ -208,6 +208,8 @@ func oidcPerson(id Identity, u User, extra map[string]any) string {
 // adminPre is magpie's console for an admin: magpie's own, every view of
 // it, with the portal's pages (门户管理, 我的密钥, 退出登录) in its sidebar
 // and the admin's address at its foot, put there as the sidebar is drawn.
+// The page opens on Agents, which no admin has (prune), so the script
+// steers it to Providers as soon as the page has drawn it.
 func adminPre(id Identity) []byte {
 	return []byte(`<script id="oidc-portal">(function(){
 ` + oidcPerson(id, User{}, map[string]any{"admin": true}) + `
@@ -235,7 +237,31 @@ function add(){
  if(foot&&!foot.querySelector("#oidcWho")){var d=document.createElement("div");d.id="oidcWho";
   d.style.cssText="padding:6px 10px;font-size:11px;color:var(--muted,#8a8a8e);overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
   d.textContent=window.oidcPerson.email;foot.appendChild(d);}}
-var n=0;function poll(){try{add()}catch(e){}if(n++<200)setTimeout(poll,50);}
+
+// the page opens on Agents, which is not this deployment's. Once the page
+// has drawn it, the admin is steered to Providers, the one view they open:
+// its page shown, its sidebar's button the one on, as the page draws a
+// view; then the page's own show, which is how Providers loads, a turn on
+// (the page calls show for its Agents after this one on this turn). A click
+// of the admin's after, one after the turn this runs on, is theirs: this
+// does not run over it
+var stopped=false, waiting=false, n=0;
+function steer(){
+ var v=document.getElementById("view-providers"), a=document.getElementById("view-agents");
+ if(!v||!a)return false;
+ waiting=true;n=0;
+ document.querySelectorAll("main.view").forEach(function(m){m.hidden=m!==v});
+ var b=document.querySelector('#nav button[data-view="providers"]'),ba=document.querySelector('#nav button[data-view="agents"]');
+ if(b&&ba){b.classList.add("on");b.setAttribute("aria-current","page");ba.classList.remove("on");ba.removeAttribute("aria-current")}
+ setTimeout(function(){
+  if(typeof show==="function"&&!document.getElementById("view-agents").hidden){try{show("providers")}catch(e){}}
+  setTimeout(function(){if(document.getElementById("view-providers").hidden)stopped=true},50);
+ },0);
+ return true;}
+function poll(){try{add()}catch(e){}
+ if(stopped)return;
+ if(!waiting)steer();
+ if(n++<400)setTimeout(poll,50);}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",poll);else poll();})();</script>`)
 }
 
