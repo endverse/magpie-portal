@@ -31,10 +31,14 @@ const (
 // source of truth for per-person access; oidc.yaml's users: and groups: are
 // defaults for a deployment that does not use the portal's admin page.
 type Policy struct {
-	Sub         string        `json:"sub"`
-	Email       string        `json:"email,omitempty"`
-	Name        string        `json:"name,omitempty"`
-	Groups      []string      `json:"groups,omitempty"`
+	Sub    string   `json:"sub"`
+	Email  string   `json:"email,omitempty"`
+	Name   string   `json:"name,omitempty"`
+	Groups []string `json:"groups,omitempty"`
+	// GroupStash holds the groups an admin granted with while the person's
+	// sign-in claims carried none (a role given after the approval): the
+	// grant then resolves through them until an admin edits it.
+	GroupStash  []string      `json:"grantGroups,omitempty"`
 	Status      string        `json:"status"`
 	Models      []string      `json:"models,omitempty"`
 	Budget      *BudgetConfig `json:"budget,omitempty"`
@@ -302,7 +306,14 @@ func (p Policy) modelsFor(c *Config) []string {
 	if len(p.Models) > 0 {
 		return append([]string(nil), p.Models...)
 	}
-	return c.ProvidersFor(p.Groups)
+	if out := c.ProvidersFor(p.Groups); len(out) > 0 {
+		return out
+	}
+	have := make(map[string]bool, len(p.GroupStash))
+	for _, g := range p.GroupStash {
+		have[strings.Trim(strings.TrimSpace(g), "/")] = true
+	}
+	return c.providersNamed(have)
 }
 
 // budgetFor is the limit a policy grants: its own, or the config's.

@@ -545,12 +545,34 @@ func (s *Server) ensureAdminKey(id Identity, pol Policy) (Policy, error) {
 	if !s.cfg.IsAdmin(id) {
 		return pol, nil
 	}
-	// provision:, on by default, grants admins on sight; otherwise one
-	// with no standing yet, or still pending — a role is what they
-	// apply with
-	grant := s.cfg.ProvidersFor(id.Groups)
-	if *s.cfg.Provision || pol.Status == "" || pol.Status == StatusPending {
-		if _, err := s.policy.EnsureAdmin(id, grant, nil); err != nil {
+	// provision:, on by default, grants admins on sight. Otherwise a
+	// pending person who applies is let in (a role is what they apply
+	// with), and so is anyone approved with no models to resolve (the
+	// approval granted nothing). A rejected or disabled person is left
+	// as they are: the portal's standing still says no, even for a role.
+	// With provision: off, a role grants no standing by itself.
+	fresh := (*s.cfg.Provision && pol.Status != StatusRejected && pol.Status != StatusDisabled) || pol.Status == StatusPending
+	granted := fresh || unfundedRole(pol, s.cfg)
+	if granted {
+		// The grant goes in place: with no models they have no standing
+		// to bring to Adopt, which leaves out a record that is already
+		// there. Their groups become this sign-in's, so the grant
+		// resolves through the role they now hold; one an admin made
+		// against other groups is kept to resolve through while none
+		// of theirs name a provider.
+		var err error
+		if pol, err = s.policy.Update(id.Subject, func(p *Policy) error {
+			// A standing an admin already set keeps its status: here a
+			// granted super admin is never rejected or disabled.
+			if fresh {
+				p.Status, p.Models, p.Budget = StatusActive, nil, nil
+			}
+			if len(p.Models) == 0 {
+				p.GroupStash = append([]string(nil), p.Groups...)
+			}
+			p.Groups = append([]string(nil), id.Groups...)
+			return nil
+		}); err != nil {
 			return pol, err
 		}
 	}
@@ -562,6 +584,14 @@ func (s *Server) ensureAdminKey(id Identity, pol Policy) (Policy, error) {
 		return pol, err
 	}
 	return pol, nil
+}
+
+// unfundedRole says whether an active standing resolves to no models: an
+// approving admin left the models to the person's groups, and those groups
+// (as last seen) name no provider. It is an approval made with nothing to
+// grant, as one made before the person was given a role.
+func unfundedRole(pol Policy, cfg *Config) bool {
+	return pol.Status == StatusActive && len(pol.Models) == 0 && len(cfg.ProvidersFor(pol.Groups)) == 0
 }
 
 // keyPageCSP is the key page's own header: magpie's page is one file with
@@ -948,12 +978,23 @@ func (s *Server) adminSave(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/admin/user?sub="+url.QueryEscape(sub)+"&saved=1", http.StatusFound)
 }
 
+// superStays answers an admin asking to turn away someone Keycloak holds
+// up as a super maintainer: the portal's approval cannot grant or take
+// that, so it leaves the standing as it is.
+func (s *Server) superStays(w http.ResponseWriter, r *http.Request, pol Policy) {
+	s.fail(w, http.StatusConflict, fmt.Sprintf("%s 持有超级维护者角色（%s），其权限由 Keycloak 决定：要在门户里让这个人退出，请先在 Keycloak 收回该角色。", personOf(pol), RoleSuper), true)
+}
+
 func (s *Server) adminReject(w http.ResponseWriter, r *http.Request) {
 	_, id, ok := s.requireAdmin(w, r)
 	if !ok {
 		return
 	}
 	sub := strings.TrimSpace(r.FormValue("sub"))
+	if pol, ok := s.policy.Get(sub); ok && s.cfg.isSuperStanding(pol) {
+		s.superStays(w, r, pol)
+		return
+	}
 	actor := personOf(Policy{Email: id.Email, Sub: id.Subject})
 	pol, err := s.policy.Reject(sub, actor, r.FormValue("note"))
 	if err != nil {
@@ -971,6 +1012,10 @@ func (s *Server) adminDisable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sub := strings.TrimSpace(r.FormValue("sub"))
+	if pol, ok := s.policy.Get(sub); ok && s.cfg.isSuperStanding(pol) {
+		s.superStays(w, r, pol)
+		return
+	}
 	actor := personOf(Policy{Email: id.Email, Sub: id.Subject})
 	pol, err := s.policy.Disable(sub, actor, r.FormValue("note"))
 	if err != nil {
@@ -996,6 +1041,12 @@ func (s *Server) adminEnable(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.fail(w, http.StatusBadRequest, err.Error(), true)
 		return
+	}
+	if s.cfg.isSuperStanding(pol) {
+		if _, err = s.ensureAdminKey(pol.identity(), pol); err != nil {
+			s.provisionFailed(w, r, err)
+			return
+		}
 	}
 	if _, err := s.prov.ApplyPolicy(pol); err != nil {
 		s.provisionFailed(w, r, err)
@@ -1073,6 +1124,10 @@ func (s *Server) approvalHook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sub := strings.TrimSpace(in.Sub)
+	if pol, ok := s.policy.Get(sub); ok && (in.Action == "reject" || in.Action == "disable") && s.cfg.isSuperStanding(pol) {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "the person holds " + RoleSuper + ": Keycloak decides their access, not the portal"})
+		return
+	}
 	var pol Policy
 	actor := "hook"
 	switch in.Action {

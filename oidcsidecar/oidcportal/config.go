@@ -321,6 +321,16 @@ func (c *Config) ProvidersFor(groups []string) []string {
 	for _, g := range groups {
 		have[strings.Trim(strings.TrimSpace(g), "/")] = true
 	}
+	if out := c.providersNamed(have); len(out) > 0 {
+		return out
+	}
+	return append([]string(nil), c.DefaultProviders...)
+}
+
+// providersNamed is the providers the member groups name, sorted, with
+// none standing in when none name any: callers that know of no groups to
+// fall back on get nothing.
+func (c *Config) providersNamed(have map[string]bool) []string {
 	var out []string
 	seen := map[string]bool{}
 	for _, name := range sortedKeys(c.Groups) {
@@ -334,11 +344,8 @@ func (c *Config) ProvidersFor(groups []string) []string {
 			}
 		}
 	}
-	if len(out) > 0 {
-		sort.Strings(out)
-		return out
-	}
-	return append([]string(nil), c.DefaultProviders...)
+	sort.Strings(out)
+	return out
 }
 
 // ModelsFor is what the identity's key may use: its own policy's models
@@ -411,6 +418,13 @@ func normalizeUsers(in map[string]UserPolicy) (map[string]UserPolicy, error) {
 // roles live in the provider, their names here.
 func (c *Config) IsAdmin(id Identity) bool {
 	return c.IsSuperAdmin(id) || id.HasRole(RoleOperator)
+}
+
+// isSuperStanding says whether a standing's last-seen groups make it a
+// super maintainer's: what an admin may turn away is a grant, and the
+// role is Keycloak's to give and take, never the portal's.
+func (c *Config) isSuperStanding(pol Policy) bool {
+	return c.IsSuperAdmin(pol.identity())
 }
 
 // IsSuperAdmin says whether the identity may do what only a super admin
