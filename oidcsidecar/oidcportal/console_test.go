@@ -406,7 +406,7 @@ func TestConsoleAllowedByRole(t *testing.T) {
 		method string
 		want   bool
 	}{
-		// operator 的运营面
+		// the operator's operations face
 		{op, "/api/providers", "GET", true},
 		{op, "/api/providers", "POST", true},
 		{op, "/api/groups", "GET", true},
@@ -416,12 +416,12 @@ func TestConsoleAllowedByRole(t *testing.T) {
 		{op, "/api/gateway/restart", "POST", false}, // sub-paths are not blanket-allowed
 		{op, "/api/usage", "GET", true},
 		{op, "/api/usage/heatmap", "GET", true},
-		// 台账是逐条记录:operator 只有概览
+		// the ledger is row by row: operator reads the overview only
 		{op, "/api/usage/requests", "GET", false},
 		{op, "/api/usage/requests.csv", "GET", false},
 		{op, "/api/usage/requests/export", "GET", false},
 		{sup, "/api/usage/requests", "GET", true},
-		// 密钥表归 operator;改密钥是 super 的
+		// the key table is the operator's; changing a key is a super admin's
 		{op, "/api/caller-keys", "GET", true},
 		{op, "/api/caller-keys/models", "GET", true},
 		{op, "/api/caller-keys/models", "POST", false},
@@ -433,7 +433,7 @@ func TestConsoleAllowedByRole(t *testing.T) {
 		{op, "/api/plugin-panels", "GET", true},
 		{op, "/api/settings", "GET", true},
 		{op, "/api/set", "POST", true},
-		// routing 页的上下文,涉密:operator 不行,super 行
+		// the routing page's context, confidential: operator no, super yes
 		{op, "/api/gateway/trace", "GET", false},
 		{op, "/api/gateway/history", "GET", false},
 		{op, "/api/gateway/session-titles", "POST", false},
@@ -446,16 +446,17 @@ func TestConsoleAllowedByRole(t *testing.T) {
 		{sup, "/api/gateway/call", "GET", true},
 		{sup, "/api/usage/requests/content", "GET", true},
 		{sup, "/api/context/text", "GET", true},
-		// 没人能看的:密钥值与档案
+		// nobody's: key values and archives
 		{sup, "/api/caller-keys/copy-key", "POST", false},
 		{sup, "/api/sessions/one", "GET", false},
 		{op, "/api/caller-keys/copy-key", "POST", false},
-		// operator 不看业务面
+		// operator does not read the business face
 		{op, "/api/library", "GET", false},
 		{sup, "/api/library", "GET", true},
-		// InGroup 是大小写不敏感的,角色也一样; path 不是
+		// InGroup reads groups case-insensitively, and roles are groups too;
+		// paths themselves stay case-sensitive
 		{op, "/api/PROVIDERS", "GET", false},
-		// 没列出的 API:operator 拒绝
+		// an API path not listed: refused
 		{op, "/api/unknown", "GET", false},
 	}
 	for _, c := range cases {

@@ -398,7 +398,9 @@ const (
 // keyPageRoute is the key page's data routes (internal/gateway/key_page.go):
 // the bearer is the portal's key for this admin, so the answer is that
 // key's own. A result of keyPageGranted sits between the two roles: an
-// operator only where the operations face already reaches.
+// operator only where the operations face already reaches, and even there
+// only as the caller's own rows, whoever they are: their own ledger, their
+// own key table. The page never widens operatorAllowed; it asks less.
 func keyPageRoute(path string) (int, bool) {
 	switch path {
 	case "/v1/magpie/me", "/v1/magpie/me/usage":
