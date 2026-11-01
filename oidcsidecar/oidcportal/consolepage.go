@@ -257,7 +257,7 @@ window.addEventListener("error",function(e){var m=String(e&&e.message||"");if(/^
 // says them (a page of the portal's does; said twice is a mistake the page
 // reports)
 function oidcSay(d){var z={};for(var k in d){if(!(k in (typeof I18N!=="undefined"&&I18N.zh||{}))){z[k]=d[k]}}magpie.strings({zh:z})}
-oidcSay({"Allowance":"额度","My key":"我的密钥"});
+oidcSay({"Allowance":"额度","My key":"我的密钥","Tokens":"Tokens","No requests in this period yet.":"此时间段还没有请求。"});
 
 // oidcText is a value escaped for the page, cut where it is long
 function oidcText(s,n){s=String(s==null?"":s);if(n&&s.length>n)s=s.slice(0,n)+"…";return s}
@@ -345,10 +345,11 @@ var cur=location.search.indexOf("period=")>-1?(location.search.match(/period=(\w
 for(var i=0;i<PS.length;i++){(function(p,label){
  var b=oidcEl("button","opt"+(p===cur?" on":""));b.type="button";b.textContent=label;
  b.onclick=function(){
-  // the period is in the address, the page open's after it (?view=oidc-usage)
+  // the period is in the address, the page open's after it (?view=oidc-usage):
+  // the page's own show runs open again, which draws the period's figures
   var q=new URLSearchParams(location.search);q.set("period",p);
   history.replaceState(null,"","?"+q);
-  oidcAsk("me/usage?"+q).then(function(v){page.replaceWith(oidcUsagePage(v))}).catch(function(){});
+  var r=typeof show==="function"?show("oidc-usage"):null;if(r&&r.catch){r.catch(function(e){})}
  };
  segs.appendChild(b);
 })(PS[i][0],PS[i][1])}
@@ -359,7 +360,7 @@ page.appendChild(head);
 // the period's figures, the page's own tiles
 var stats=oidcEl("section","stats");
 var tile=function(n,label,sub){var k=oidcEl("div","kpi");var b=oidcEl("b","",n);k.appendChild(b);k.appendChild(oidcEl("span","",label));if(sub)k.appendChild(oidcEl("small","",sub));return k};
-stats.appendChild(tile(oidcNum(tot.tokens),"Tokens",""));
+stats.appendChild(tile(oidcNum(tot.tokens),t("Tokens"),""));
 stats.appendChild(tile(String(tot.calls||0),t("Requests"),""));
 stats.appendChild(tile(oidcMoney(tot.cost),t("Cost"),""));
 stats.appendChild(tile(oidcNum(tot.input),"输入",""));
@@ -381,7 +382,7 @@ if((u.recent||[]).length){
  var wrap=oidcEl("div","oidc-led");
  var table=oidcEl("table","led");
  var thead=oidcEl("thead");var hr=oidcEl("tr");
- [t("Time"),t("Model"),t("Status"),"Tokens"].forEach(function(h){hr.appendChild(oidcEl("th","",h))});
+ [t("Time"),t("Model"),t("Status"),t("Tokens")].forEach(function(h){hr.appendChild(oidcEl("th","",h))});
  thead.appendChild(hr);table.appendChild(thead);
  var tbody=oidcEl("tbody");
  for(var i=0;i<u.recent.length;i++){(function(q){
@@ -403,18 +404,24 @@ return page;
 // shown by its own show(), in its own sidebar, with its own styling — no
 // page of this deployment's is theirs
 magpie.plugin("oidc-person",function(ctx){
-ctx.slots.add("page",{key:"mine",title:t("My key"),open:function(){
- // the view's own column of rows (console.css: .oidc-page)
+// the view's own column of rows (console.css: .oidc-page), mounted into
+// the page's own main: the page's kernel mounts part.html and runs open
+// for its loading — the element open draws is the caller's, not the
+// kernel's, so the drawing goes into #view-<key> itself
+ctx.slots.add("page",{key:"mine",html:"",open:function(){
+ var main=document.getElementById("view-mine");if(!main)return;
  var p=document.createElement("div");p.className="oidc-page";
+ main.replaceChildren(p);
  p.appendChild(oidcEl("div","oidc-loading",t("Loading…")));
  var out=oidcAsk("me").then(function(me){
   p.replaceChildren(oidcMinePage(me));
  }).catch(function(){p.replaceChildren(oidcEl("p","led-none","—"))});
  return out;
 }});
-ctx.slots.add("page",{key:"oidc-usage",title:t("Usage"),open:function(){
- // the view's own column of rows (console.css: .oidc-page)
+ctx.slots.add("page",{key:"oidc-usage",html:"",open:function(){
+ var main=document.getElementById("view-oidc-usage");if(!main)return;
  var p=document.createElement("div");p.className="oidc-page";
+ main.replaceChildren(p);
  p.appendChild(oidcEl("div","oidc-loading",t("Loading…")));
  var cur=location.search.indexOf("period=")>-1?"?"+location.search.match(/period=(\w+)/)[0]:"";
  var out=oidcAsk("me/usage"+cur).then(function(u){
