@@ -11,11 +11,11 @@ const consoleCSS = personCSS + framedCSS
 // page draws <a>, its nav buttons are <button>), their forms, and their
 // tables' wrap, in the page's own measures.
 const framedCSS = `
-#nav a.view-btn { display: flex; align-items: center; justify-content: flex-start; gap: 9px; width: 100%; height: 30px; padding: 0 8px; border-radius: 7px; font-size: 13px; color: var(--fg-2); text-align: left; white-space: nowrap; text-decoration: none; }
-#nav a.view-btn > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-#nav a.view-btn:hover:not(.on) { background: var(--pill); color: var(--fg); }
-#nav a.view-btn.on { background: var(--card); color: var(--fg); box-shadow: var(--seg-edge); font-weight: 500; }
-#nav a.view-btn .nav-ic { display: block; flex: none; color: var(--muted); }
+#nav a { display: flex; align-items: center; justify-content: flex-start; gap: 9px; width: 100%; height: 30px; padding: 0 8px; border-radius: 7px; font-size: 13px; color: var(--fg-2); text-align: left; white-space: nowrap; text-decoration: none; }
+#nav a > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#nav a:hover:not(.on) { background: var(--pill); color: var(--fg); }
+#nav a.on { background: var(--card); color: var(--fg); box-shadow: var(--seg-edge); font-weight: 500; }
+#nav a .nav-ic { display: block; flex: none; color: var(--muted); }
 .side-foot .oidc-who { padding: 8px 10px 2px; font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .oidc-led { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin: 4px 0 12px; }
 .oidc-led .led-none { padding: 14px; margin: 0; color: var(--muted); text-align: center; font-size: 12px; }
