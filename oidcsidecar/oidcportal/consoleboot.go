@@ -58,6 +58,9 @@ func (f *consoleFetch) serveBoot(w http.ResponseWriter, r *http.Request, id Iden
 	if f.cfg.IsAdmin(id) {
 		extra["admin"] = true
 	}
+	if f.cfg.IsSuperAdmin(id) {
+		extra["super"] = true
+	}
 	fmt.Fprintf(w, "%s\n", oidcPerson(id, person, extra))
 	// the page is the portal's own from its first script; this deployment's
 	// style for it goes in beside the page's, not through document.write,
@@ -67,6 +70,7 @@ func (f *consoleFetch) serveBoot(w http.ResponseWriter, r *http.Request, id Iden
 }
 
 // roleScript says whose console this is, from the page's first script:
-// magpie's own drawn by the page for an admin (oidc-admin), an ordinary
-// person's here (oidc-person; console.css, personScript).
-const roleScript = "document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){document.documentElement.className+=' '+(window.oidcPerson&&window.oidcPerson.admin?'oidc-admin':'oidc-person')},300)});\n"
+// magpie's own drawn by the page, for a super admin (oidc-super) or an
+// operator (oidc-operator), or an ordinary person's here (oidc-person).
+// console.css prunes the page by the class.
+const roleScript = "document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){var p=window.oidcPerson||{};var r=p.super?'oidc-super':p.admin?'oidc-operator':'oidc-person';document.documentElement.className+=' '+r},300)});\n"

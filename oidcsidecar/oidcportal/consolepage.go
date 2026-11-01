@@ -212,7 +212,15 @@ func adminPre(id Identity) []byte {
 	return []byte(`<script id="oidc-portal">(function(){
 ` + oidcPerson(id, User{}, map[string]any{"admin": true}) + `
 var links=[["/admin","门户管理"],["/mine","我的密钥"],["/logout","退出登录"]];
-function add(){var side=document.querySelector(".side-scroll");if(!side)return;
+// the Work pages are this deployment's machine's own: no role of the
+// portal's reads them
+function prune(){
+ if(document.documentElement.classList.contains("oidc-pruned"))return;
+ document.documentElement.classList.add("oidc-pruned");
+ var nav=document.querySelector("#nav");if(!nav)return;
+ ["agents","sessions","library"].forEach(function(v){var b=nav.querySelector('button[data-view="'+v+'"]');if(b)b.remove()});}
+function add(){
+ prune();var side=document.querySelector(".side-scroll");if(!side)return;
  if(!side.querySelector("#oidcPortalLinks")){var box=document.createElement("div");box.id="oidcPortalLinks";
   box.style.cssText="display:flex;flex-direction:column;gap:2px;padding:8px 6px;margin-bottom:6px;border-bottom:1px solid var(--line,rgba(0,0,0,.08))";
   links.forEach(function(l){var a=document.createElement("a");a.href=l[0];a.textContent=l[1];

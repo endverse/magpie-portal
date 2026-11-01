@@ -196,3 +196,87 @@ if (nav.children.filter((c) => c.tag === "button" && c.dataset.view && c.dataset
   throw new Error("the page's own views are left in the nav");
 if (foot.children.length === 0) throw new Error("the person is not at the sidebar's foot");
 `
+
+// An admin's script takes the page's nav down to the role's pages: the
+// Work group (agents, sessions, library) is out for every admin, and the
+// document's class says which role reads it.
+func TestAnAdminsNavMatchesTheirRole(t *testing.T) {
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is not installed")
+	}
+	cmd := exec.Command(node, "-e", adminRunner)
+	cmd.Stdin = strings.NewReader(string(scriptCode(adminPre(Identity{
+		Email: "boss@example.com", Groups: []string{RoleOperator},
+	}))))
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("an operator's nav: %v\n%s", err, out)
+	}
+}
+
+// adminRunner is node's page for consolepage.go's adminPre: magpie's
+// sidebar with #nav holding every view's button; and the page's first
+// script (consoleboot.go's roleScript), run afterwards, as /boot.js runs it
+// before the page's own. After them, the Work views are out of the nav, the
+// console's stay, and the document says whose console it is.
+const adminRunner = `
+const src = require("fs").readFileSync(0, "utf8");
+let id = 0;
+const mk = (tag) => {
+  const n = { tag, id: ++id, nodeType: 1, children: [], parentNode: null, textContent: "", style: {}, dataset: {},
+    classList: { set: new Set(), add(c) { this.set.add(c) }, remove(c) { this.set.delete(c) },
+      contains(c) { return this.set.has(c) }, toggle(c, on) { if (on === undefined) on = !this.set.has(c); on ? this.set.add(c) : this.set.delete(c) } },
+    get className() { return [...this.classList.set].join(" ") }, set className(v) { this.classList.set = new Set(String(v).split(/\s+/).filter(Boolean)) },
+    appendChild(c) { if (c.parentNode) c.remove(); this.children.push(c); c.parentNode = this; return c },
+    removeChild(c) { const i = this.children.indexOf(c); if (i >= 0) this.children.splice(i, 1); c.parentNode = null; return c },
+    remove() { this.parentNode && this.parentNode.removeChild(this) },
+    setAttribute(k, v) { this[k] = String(v) }, removeAttribute(k) { delete this[k] },
+    querySelector(sel) { return this.querySelectorAll(sel)[0] || null }, querySelectorAll(sel) {
+      const out = [];
+      const want = sel.split(",").map((s) => s.trim());
+      const hits = (c, w) => {
+        if (c.tag !== "button" || !w.startsWith("button[data-view")) return false;
+        if (w === "button[data-view]") return !!c.dataset.view;
+        const m = w.match(/^button\[data-view="([^"]+)"\]$/);
+        return !!m && c.dataset.view === m[1];
+      };
+      const walk = (n) => n.children.forEach((c) => { if (want.some((w) => hits(c, w))) out.push(c); walk(c) });
+      walk(this); return out }, addEventListener() {}, hidden: false,
+    contains(o) { for (let n = o; n; n = n.parentNode) if (n === this) return true; return false } };
+  Object.defineProperty(n, "childNodes", { get() { return n.children } });
+  return n;
+};
+const body = mk("body");
+const side = body.appendChild(mk("div"));
+side.className = "side-scroll";
+const nav = side.appendChild(mk("nav"));
+nav.id = "nav";
+const views = ["agents", "sessions", "library", "providers", "routing", "gateway", "usage", "masking", "plugins"];
+views.forEach((v) => { const b = nav.appendChild(mk("button")); b.dataset.view = v; const s = b.appendChild(mk("span")); s.textContent = v });
+const foot = body.appendChild(mk("div")); foot.className = "side-foot";
+const els = { "#nav": nav, ".side-scroll": side, ".side-foot": foot };
+const doc = { readyState: "complete", documentElement: mk("html"), ready: [], getElementById: () => null, querySelector: (s) => els[s] || null,
+  createElement: mk, body, title: "", addEventListener(t, f) { if (t === "DOMContentLoaded") this.ready.push(f) } };
+globalThis.document = doc;
+globalThis.t = (s) => s;
+globalThis.show = () => {};
+globalThis.I18N = { zh: {} };
+globalThis.location = { pathname: "/", search: "" };
+globalThis.MutationObserver = class { observe() {} };
+globalThis.setInterval = () => 0;
+globalThis.setTimeout = (f) => { f(); return 0 };
+globalThis.window = { addEventListener() {} };
+globalThis.window.oidcPerson = { email: "boss@example.com", admin: true, super: false };
+// the document says whose console it is before the page draws it: the
+// class stands for the role until consoleboot.go's roleScript writes it
+const load = doc.ready.slice();
+doc.ready = [];
+doc.documentElement.className = "oidc-operator";
+new Function(src)();
+doc.ready.push(...load);
+doc.ready.forEach((f) => f());
+const left = nav.children.filter((c) => c.tag === "button" && c.dataset.view).map((b) => b.dataset.view).join(",");
+if (left !== "providers,routing,gateway,usage,masking,plugins") throw new Error("an operator's nav: " + left);
+if (!doc.documentElement.className.split(" ").includes("oidc-operator"))
+  throw new Error("the document's class: " + JSON.stringify(doc.documentElement.className));
+`

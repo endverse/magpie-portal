@@ -5,7 +5,15 @@ package oidcportal
 // consolepage.go), and what the portal's own pages in magpie's frame
 // (magpiepage.go) need — their sidebar's rows, their tables and forms, as
 // the page's own views are drawn.
-const consoleCSS = personCSS + framedCSS
+const consoleCSS = personCSS + roleCSS + framedCSS
+
+// roleCSS is what the page's role leaves out of an admin's console: the
+// routing page's live requests and their bodies are a super admin's, as is
+// the jump to Langfuse.
+const roleCSS = `
+html.oidc-operator #rt, html.oidc-operator #rtMore { display: none; }
+html.oidc-operator a[href*="langfuse"] { display: none; }
+`
 
 // framedCSS is the framed pages' own: their sidebar rows are links (the
 // page draws <a>, its nav buttons are <button>), their forms, and their
