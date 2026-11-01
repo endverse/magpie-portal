@@ -371,7 +371,7 @@ func consoleAllowed(super bool, path, method string, keyID string) bool {
 		if strings.HasPrefix(path, "/_magpie/sign-in") {
 			return false
 		}
-		return super // plugin frames are not part of the six admin areas
+		return super // plugin frames are not part of the operator's face
 	}
 	if path != "/api" && !strings.HasPrefix(path, "/api/") {
 		// The console's own page and its relative assets (app.js, app.css,
@@ -463,9 +463,9 @@ func confidential(path string) bool {
 }
 
 // operatorAllowed is the operations face of the console: providers,
-// routing groups, the gateway, usage overview, masking, plugins and
+// routing groups, the gateway, the usage overview, masking, plugins and
 // settings. The request's own words are not here: confidential() already
-// stopped them.
+// stopped them, and per-request or per-key detail is not either.
 func operatorAllowed(path, method string) bool {
 	get := method == http.MethodGet || method == http.MethodHead
 	switch {
@@ -488,10 +488,11 @@ func operatorAllowed(path, method string) bool {
 		return method == http.MethodPost
 	case path == "/api/plugins", strings.HasPrefix(path, "/api/plugins/"), path == "/api/plugin-panels":
 		return true
-	case path == "/api/caller-keys", strings.HasPrefix(path, "/api/caller-keys/"):
-		return true
-	case path == "/api/usage", strings.HasPrefix(path, "/api/usage/"):
-		return true
+	case path == "/api/caller-keys", path == "/api/caller-keys/models":
+		return get // the key table and what a key may be held to; a change is a super admin's
+	case path == "/api/usage", path == "/api/usage/heatmap", path == "/api/usage/deleted",
+		path == "/api/usage/token":
+		return get // the overview; the requests ledger and its exports are a super admin's
 	case path == "/api/masking", strings.HasPrefix(path, "/api/masking/"):
 		return true
 	case path == "/api/settings", strings.HasPrefix(path, "/api/settings/"):

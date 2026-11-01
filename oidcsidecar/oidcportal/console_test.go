@@ -213,6 +213,8 @@ func TestOrdinaryAdminConsoleIsScoped(t *testing.T) {
 		{http.MethodPost, "/api/caller-keys/rotate-key", http.StatusForbidden},
 		{http.MethodGet, "/api/settings/search-key", http.StatusForbidden},
 		{http.MethodGet, "/api/gateway/trace", http.StatusForbidden},
+		{http.MethodGet, "/api/usage/requests", http.StatusForbidden},
+		{http.MethodPost, "/api/caller-keys/on", http.StatusForbidden},
 		{http.MethodPost, "/api/gateway/session-titles", http.StatusForbidden},
 		{http.MethodGet, "/api/library", http.StatusForbidden},
 		{http.MethodGet, "/api/unknown", http.StatusForbidden},
@@ -413,6 +415,19 @@ func TestConsoleAllowedByRole(t *testing.T) {
 		{op, "/api/gateway/route", "GET", false},
 		{op, "/api/gateway/restart", "POST", false}, // sub-paths are not blanket-allowed
 		{op, "/api/usage", "GET", true},
+		{op, "/api/usage/heatmap", "GET", true},
+		// 台账是逐条记录:operator 只有概览
+		{op, "/api/usage/requests", "GET", false},
+		{op, "/api/usage/requests.csv", "GET", false},
+		{op, "/api/usage/requests/export", "GET", false},
+		{sup, "/api/usage/requests", "GET", true},
+		// 密钥表归 operator;改密钥是 super 的
+		{op, "/api/caller-keys", "GET", true},
+		{op, "/api/caller-keys/models", "GET", true},
+		{op, "/api/caller-keys/models", "POST", false},
+		{op, "/api/caller-keys/rename-key", "POST", false},
+		{op, "/api/caller-keys/on", "POST", false},
+		{sup, "/api/caller-keys/rename-key", "POST", true},
 		{op, "/api/masking/records", "GET", true},
 		{op, "/api/plugins", "GET", true},
 		{op, "/api/plugin-panels", "GET", true},
