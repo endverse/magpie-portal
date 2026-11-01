@@ -157,8 +157,17 @@ func (f *consoleFetch) servePage(w http.ResponseWriter, r *http.Request, id Iden
 		whole = append(whole, pre...)
 		whole = append(whole, '<', '/', 's', 'c', 'r', 'i', 'p', 't', '>')
 	} else {
-		whole = append(whole, roleScript...)
-		whole = append(whole, pre...)
+		// the role line runs from the page's first script (boot.js says it
+		// too, before the page's own); here it is said inside the script
+		// element adminPre brings, not as bare text of the page
+		if j := bytes.Index(pre, []byte("(function(){")); j >= 0 {
+			whole = append(whole, pre[:j]...)
+			whole = append(whole, roleScript...)
+			whole = append(whole, pre[j:]...)
+		} else {
+			whole = append(whole, roleScript...)
+			whole = append(whole, pre...)
+		}
 	}
 	whole = append(whole, page[i:]...)
 	h := w.Header()
