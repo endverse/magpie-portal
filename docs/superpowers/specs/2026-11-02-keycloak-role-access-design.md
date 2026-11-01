@@ -1,72 +1,48 @@
-# Role-based access built into the sidecar — design
+# 门户角色权限内置化 — 设计文档
 
-Date: 2026-11-02
-Status: approved in conversation, awaiting spec review
+日期:2026-11-02
+状态:对话中已确认方向,待 spec 评审
 
-## Problem
+## 问题
 
-The portal's admin rights today come from the config file (`admins`,
-`super_admins`, their `*_groups` variants in oidc.yaml). Anyone who can edit
-that file grants themselves admin. The operator (project maintainer) role
-does not exist at all: today a person is either a full admin or a plain user.
+现在门户的管理员判定来自配置文件(oidc.yaml 里的 `admins`、`super_admins` 及其 `*_groups` 变体)。任何能改这个文件的人都能把自己变成管理员。而且"项目维护者"(operator)这个角色根本不存在:现在一个人要么是完整管理员,要么是普通用户。
 
-The deployment wants roles to live in Keycloak, not in a file the portal
-reads: assigning a role to a person happens in the Keycloak admin console,
-and the sidecar only reads what the login token says. No role configuration
-in oidc.yaml.
+部署方希望角色由 Keycloak 管理,而不是由门户读取的文件管理:给某人分配角色在 Keycloak 管理台里做,sidecar 只读登录令牌里的内容。oidc.yaml 里没有任何角色配置。
 
-## Roles (built-in, names not configurable)
+## 角色(内置,角色名不可配置)
 
-Two role names, fixed in code:
+两个写死在代码里的角色名:
 
-| Keycloak role        | Portal identity    | What they see |
-|----------------------|--------------------|---------------|
-| `magpie-super`       | super maintainer   | everything an operator sees **plus** 门户管理 (people, budgets, approvals) |
-| `magpie-operator`    | project operator   | magpie console's 供应商, 路由, 网关, 用量 (overview only), 设置 |
-| (neither)            | user               | own key page (我的密钥) and own usage (用量) — already built |
+| Keycloak 角色 | 门户身份 | 能看到什么 |
+|---|---|---|
+| `magpie-super` | 超级维护者 | operator 的一切 **外加** 门户管理(人员、额度、审批) |
+| `magpie-operator` | 项目维护者 | magpie 控制台的 供应商、路由、网关、用量(仅概览)、设置 |
+| (两者都没有) | 普通用户 | 自己的密钥页(我的密钥)和自己的用量(用量)——已实现 |
 
-A person holding both roles is a super maintainer. Roles are realm roles in
-Keycloak; the token carries them in a claim (default path
-`realm_access.roles`, still overridable by the existing `group_claim`
-setting — that key keeps its name and behavior).
+一个人同时持有两个角色就是超级维护者。角色是 Keycloak 的 realm 角色;令牌通过 claim 携带它们(默认路径 `realm_access.roles`,仍可用现有 `group_claim` 设置覆盖——该配置键保留原名称和行为)。
 
-## Enforcement: route filtering by role
+## 权限执行:按角色过滤路由
 
-Magpie's console is a set of page routes (hash routes rendering `view-*`
-plus the backend APIs they call). The sidecar serves magpie's page 1:1 and
-filters by role at two layers:
+magpie 控制台是一组页面路由(hash 路由渲染 `view-*`,加上它们调用的后端 API)。sidecar 1:1 地提供 magpie 的页面,并在两层按角色过滤:
 
-1. **Frontend** — the injected role script removes nav entries and views
-   outside the role's whitelist. Experience only.
-2. **Backend** — the sidecar's reverse proxy rejects requests for routes /
-   APIs outside the role's whitelist (404 or a permission page), so a
-   crafted request cannot reach magpie. This is the actual permission
-   boundary.
+1. **前端**——注入的角色脚本移除角色白名单之外的导航项和视图。这只影响体验。
+2. **后端**——sidecar 的反向代理拒绝白名单之外的路由/API 请求(返回 404 或无权限页),伪造的请求到不了 magpie。这才是真正的权限边界。
 
-Whitelists are constants in the sidecar's Go code. Adding a page to a role
-means changing code, not config.
+白名单是 sidecar Go 代码里的常量。给角色加页面意味着改代码,不是改配置。
 
-## Config changes
+## 配置变更
 
-- oidc.yaml loses `admins`, `admin_groups`, `super_admins`,
-  `super_admin_groups`. `IsAdmin`/`IsSuperAdmin` are answered by the token's
-  roles only.
-- Everything else in the config (issuer, client_id, redirect_url, groups →
-  model mapping, budgets, per-person overrides) stays as is. Budgets and
-  model grants are still sidecar data, managed on the admin page.
+- oidc.yaml 删除 `admins`、`admin_groups`、`super_admins`、`super_admin_groups`。`IsAdmin`/`IsSuperAdmin` 只由令牌中的角色决定。
+- 配置里其他一切(issuer、client_id、redirect_url、groups → 模型映射、额度、按人覆盖)保持不变。额度和模型授权仍是 sidecar 自己的数据,在管理页维护。
 
-## Data notes
+## 数据说明
 
-- The user-facing usage page keeps filtering magpie's usage data to the
-  person's own keys (key id survives a key reset, so history is continuous).
-- Operators see usage overview only — no per-person detail. The super
-  maintainer keeps the full 门户管理.
+- 面向用户的用量页继续把 magpie 的用量数据过滤成该人自己 key 的数据(key 重置后 key id 不变,历史用量连续)。
+- operator 只看到用量概览——没有按人的明细。超级维护者保留完整的门户管理。
 
-## Testing
+## 测试
 
-- Config tests: old admin fields gone; a config without them loads.
-- Role tests: token claims → role decision, including both-roles and
-  no-roles cases, and the dotted claim path.
-- Route tests: per role, whitelisted proxy routes pass, others are rejected
-  server-side; the injected script's nav matches the whitelist.
-- The existing page-script parse tests keep running on the changed script.
+- 配置测试:旧的管理员字段已删除;没有这些字段的配置能加载。
+- 角色测试:令牌 claim → 角色判定,包括同时有两个角色、没有角色的情况,以及点分 claim 路径。
+- 路由测试:每个角色,白名单内的代理路由放行,其余在服务端拒绝;注入脚本的导航与白名单一致。
+- 现有的页面脚本解析测试在改动的脚本上继续运行。
