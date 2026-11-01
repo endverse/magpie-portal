@@ -80,8 +80,9 @@ groups:
 default_providers: []
 
 # Who may open /admin is not set here: roles live in the identity provider
-# (Keycloak), as the realm roles magpie-operator and magpie-super in the
-# token's groups claim. magpie-super may also open the console's plugin
+# (Keycloak), as the realm roles magpie-operator and magpie-super where
+# group_claim reads them: the groups claim, or realm_access.roles for
+# Keycloak roles. magpie-super may also open the console's plugin
 # frames; key values and request/response bodies stay closed to both and are
 # read in Langfuse. There is no admin list in this file.
 

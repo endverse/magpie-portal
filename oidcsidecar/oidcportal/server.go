@@ -545,7 +545,7 @@ func (s *Server) ensureAdminKey(id Identity, pol Policy) (Policy, error) {
 	if !s.cfg.IsAdmin(id) {
 		return pol, nil
 	}
-	// a provisioned deployment grants admins on sight; otherwise one
+	// provision:, on by default, grants admins on sight; otherwise one
 	// with no standing yet, or still pending — a role is what they
 	// apply with
 	grant := s.cfg.ProvidersFor(id.Groups)
