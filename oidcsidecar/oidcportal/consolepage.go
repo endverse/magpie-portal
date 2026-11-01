@@ -211,8 +211,12 @@ func oidcPerson(id Identity, u User, extra map[string]any) string {
 // The page opens on Agents, which no admin has (prune), so the script
 // steers it to Providers as soon as the page has drawn it.
 func adminPre(id Identity) []byte {
+	extra := map[string]any{"admin": true}
+	if id.HasRole(RoleSuper) {
+		extra["super"] = true
+	}
 	return []byte(`<script id="oidc-portal">(function(){
-` + oidcPerson(id, User{}, map[string]any{"admin": true}) + `
+` + oidcPerson(id, User{}, extra) + `
 var links=[["/admin","门户管理"],["/mine","我的密钥"],["/logout","退出登录"]];
 // the Work pages are this deployment's machine's own: no role of the
 // portal's reads them
