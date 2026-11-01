@@ -7,12 +7,13 @@ package oidcportal
 // the page's own views are drawn.
 const consoleCSS = personCSS + roleCSS + framedCSS
 
-// roleCSS is what the page's role leaves out of an admin's console: the
-// routing page's live requests and their bodies are a super admin's, as is
-// the jump to Langfuse.
+// roleCSS is what the page's role leaves out of an admin's console. The
+// page hides what the server refuses — this is cosmetic; the proxy is the
+// check. An operator loses the routing page's live requests and the bodies
+// around them. A jump to Langfuse, when the console grows one, is a super
+// admin's too.
 const roleCSS = `
 html.oidc-operator #rt, html.oidc-operator #rtMore { display: none; }
-html.oidc-operator a[href*="langfuse"] { display: none; }
 `
 
 // framedCSS is the framed pages' own: their sidebar rows are links (the

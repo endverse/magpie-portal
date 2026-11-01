@@ -315,6 +315,6 @@ doc.ready.push(...load);
 doc.ready.forEach((f) => f());
 const left = nav.children.filter((c) => c.tag === "button" && c.dataset.view).map((b) => b.dataset.view).join(",");
 if (left !== "providers,routing,gateway,usage,masking,plugins") throw new Error("an operator's nav: " + left);
-if (!doc.documentElement.className.split(" ").includes("oidc-operator"))
-  throw new Error("the document's class: " + JSON.stringify(doc.documentElement.className));
+const roles = doc.documentElement.className.split(" ").filter((c) => c.startsWith("oidc-") && c !== "oidc-pruned");
+if (roles.join(",") !== "oidc-operator") throw new Error("the document's class: " + JSON.stringify(doc.documentElement.className));
 `
