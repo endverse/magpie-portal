@@ -41,7 +41,7 @@ type consoleUpstream struct {
 }
 
 // newConsoleServer is the portal with this console behind it, holding no
-// console of magpie's own: the six areas an admin's pages reach are the
+// console of magpie's own: the areas an admin's pages reach are the
 // console's proxy's (console.go), for an admin who is not an admin of
 // magpie's own console.
 func newConsoleServer(t *testing.T, cfg *Config, fp *fakeProvider) (*httptest.Server, *State, *PolicyStore, *http.Client) {
@@ -148,8 +148,9 @@ func doConsole(t *testing.T, c *http.Client, method, url string) (*http.Response
 	return resp, b
 }
 
-// An ordinary admin gets the six areas, read and write, but no key secret
-// and no body, and never the console's own web key.
+// An operator gets the operations face, read and write, but no key
+// secret, no request or response words and not the library, and never the
+// console's own web key.
 func TestOrdinaryAdminConsoleIsScoped(t *testing.T) {
 	up := newConsoleUpstream(t)
 	cfg := consoleConfig(t, up.URL)
@@ -211,12 +212,14 @@ func TestOrdinaryAdminConsoleIsScoped(t *testing.T) {
 		{http.MethodPost, "/api/caller-keys/add-key", http.StatusForbidden},
 		{http.MethodPost, "/api/caller-keys/rotate-key", http.StatusForbidden},
 		{http.MethodGet, "/api/settings/search-key", http.StatusForbidden},
-		{http.MethodGet, "/api/plugins", http.StatusForbidden},
+		{http.MethodGet, "/api/gateway/trace", http.StatusForbidden},
+		{http.MethodPost, "/api/gateway/session-titles", http.StatusForbidden},
+		{http.MethodGet, "/api/library", http.StatusForbidden},
 		{http.MethodGet, "/api/unknown", http.StatusForbidden},
-		{http.MethodPost, "/api/library/mcp/check", http.StatusOK},
+		{http.MethodGet, "/api/plugins", http.StatusOK},
+		{http.MethodPost, "/api/gateway/route", http.StatusOK},
 		{http.MethodPost, "/api/settings/allowips", http.StatusOK},
 		{http.MethodPost, "/api/providers/arrange", http.StatusOK},
-		{http.MethodPost, "/api/gateway/restart", http.StatusOK},
 	} {
 		resp, body := doConsole(t, c, tc.method, ts.URL+tc.path)
 		if resp.StatusCode != tc.want {
@@ -232,8 +235,8 @@ func TestOrdinaryAdminConsoleIsScoped(t *testing.T) {
 	}
 }
 
-// A super admin sees the pages an ordinary admin does not, but the same
-// key and body answers stay closed.
+// A super admin sees the request and response words an operator does not,
+// but the same key answers stay closed.
 func TestSuperAdminConsoleStillHidesKeysAndBodies(t *testing.T) {
 	up := newConsoleUpstream(t)
 	cfg := consoleConfig(t, up.URL)
@@ -242,13 +245,14 @@ func TestSuperAdminConsoleStillHidesKeysAndBodies(t *testing.T) {
 	c := freshClient(ts)
 	signIn(t, ts, c, fp, "/console/")
 
-	if resp, body := doConsole(t, c, http.MethodGet, ts.URL+"/api/plugins"); resp.StatusCode != http.StatusOK {
-		t.Fatalf("plugins: %d %s", resp.StatusCode, body)
+	for _, path := range []string{"/api/plugins", "/api/gateway/trace", "/api/gateway/call"} {
+		if resp, body := doConsole(t, c, http.MethodGet, ts.URL+path); resp.StatusCode != http.StatusOK {
+			t.Fatalf("%s: %d %s", path, resp.StatusCode, body)
+		}
 	}
 	for _, tc := range []struct {
 		method, path string
 	}{
-		{http.MethodGet, "/api/gateway/call"},
 		{http.MethodPost, "/api/caller-keys/copy-key"},
 		{http.MethodPost, "/api/caller-keys/add-key"},
 	} {
@@ -350,7 +354,7 @@ func TestTheKeyPageIsTheAdminsOwn(t *testing.T) {
 		t.Fatalf("a tab with another key: %d", resp.StatusCode)
 	}
 
-	// The usage answers the six areas already reach are theirs too.
+	// The usage answers the operations face already reaches are theirs too.
 	if resp, body := doConsole(t, c, http.MethodGet, ts.URL+"/api/usage"); resp.StatusCode != http.StatusOK {
 		t.Fatalf("/api/usage: %d %s", resp.StatusCode, body)
 	}
@@ -386,5 +390,91 @@ func TestTheKeyPageIsTheAdminsOwn(t *testing.T) {
 	resp.Body.Close()
 	if up.auth != "Bearer "+now.Key {
 		t.Fatalf("after rotating the console asked as %q", up.auth)
+	}
+}
+
+func TestConsoleAllowedByRole(t *testing.T) {
+	const (
+		op  = "operator"
+		sup = "super"
+	)
+	cases := []struct {
+		role   string
+		path   string
+		method string
+		want   bool
+	}{
+		// operator 的运营面
+		{op, "/api/providers", "GET", true},
+		{op, "/api/providers", "POST", true},
+		{op, "/api/groups", "GET", true},
+		{op, "/api/gateway", "GET", true},
+		{op, "/api/gateway/route", "POST", true},
+		{op, "/api/gateway/route", "GET", false},
+		{op, "/api/gateway/restart", "POST", false}, // sub-paths are not blanket-allowed
+		{op, "/api/usage", "GET", true},
+		{op, "/api/masking/records", "GET", true},
+		{op, "/api/plugins", "GET", true},
+		{op, "/api/plugin-panels", "GET", true},
+		{op, "/api/settings", "GET", true},
+		{op, "/api/set", "POST", true},
+		// routing 页的上下文,涉密:operator 不行,super 行
+		{op, "/api/gateway/trace", "GET", false},
+		{op, "/api/gateway/history", "GET", false},
+		{op, "/api/gateway/session-titles", "POST", false},
+		{op, "/api/gateway/call", "GET", false},
+		{op, "/api/usage/requests/content", "GET", false},
+		{op, "/api/context/text", "GET", false},
+		{sup, "/api/gateway/trace", "GET", true},
+		{sup, "/api/gateway/history", "GET", true},
+		{sup, "/api/gateway/session-titles", "POST", true},
+		{sup, "/api/gateway/call", "GET", true},
+		{sup, "/api/usage/requests/content", "GET", true},
+		{sup, "/api/context/text", "GET", true},
+		// 没人能看的:密钥值与档案
+		{sup, "/api/caller-keys/copy-key", "POST", false},
+		{sup, "/api/sessions/one", "GET", false},
+		{op, "/api/caller-keys/copy-key", "POST", false},
+		// operator 不看业务面
+		{op, "/api/library", "GET", false},
+		{sup, "/api/library", "GET", true},
+		// InGroup 是大小写不敏感的,角色也一样; path 不是
+		{op, "/api/PROVIDERS", "GET", false},
+		// 没列出的 API:operator 拒绝
+		{op, "/api/unknown", "GET", false},
+	}
+	for _, c := range cases {
+		super := c.role == sup
+		if got := consoleAllowed(super, c.path, c.method, ""); got != c.want {
+			t.Errorf("%s %s %s: got %v want %v", c.role, c.method, c.path, got, c.want)
+		}
+	}
+}
+
+// A super admin whose policy an admin rejected is still let into the
+// console: the console gate reads the role, not the policy. ROUTE TO
+// OWNER: the policy is the wrong place for this assertion.
+func TestRejectedSuperAdminIsNotAdopted(t *testing.T) {
+	up := newConsoleUpstream(t)
+	cfg := consoleConfig(t, up.URL)
+	fp := &fakeProvider{id: Identity{Subject: "root", Email: "root@example.com", Groups: []string{"team-c", RoleSuper}}}
+	ts, state, pol, _ := newConsoleServer(t, cfg, fp)
+	if _, err := pol.Seen(fp.id); err != nil {
+		t.Fatal(err)
+	}
+	if p, err := pol.Reject("root", "boss@example.com", "not this one"); err != nil || p.Status != StatusRejected {
+		t.Fatalf("reject = %+v, %v", p, err)
+	}
+	c := freshClient(ts)
+	signIn(t, ts, c, fp, "/")
+	if p, _ := pol.Get("root"); p.Status != StatusRejected {
+		t.Fatalf("signing in adopted a rejected policy: %+v", p)
+	}
+	// what the policy does say: no key for a rejected person
+	if u, ok := state.Get("root"); ok && u.KeyID != "" {
+		t.Fatalf("a rejected person holds a key: %+v", u)
+	}
+	if resp, body := doConsole(t, c, http.MethodGet, ts.URL+"/api/state"); resp.StatusCode != http.StatusOK {
+		t.Fatalf("/api/state = %d %s, want the role's 200", resp.StatusCode, body)
 	}
 }

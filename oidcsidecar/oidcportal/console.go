@@ -32,9 +32,9 @@ const maxConsolePage = 16 << 20
 // ConsoleProxy fronts magpie's web console without changing magpie: it
 // authenticates the portal's own session, injects the console's web key
 // upstream (the browser never sees it), and holds every role to the paths
-// it may use. Ordinary admins may read and write the six areas the portal
-// grants them; request bodies and key secrets are withheld from everyone,
-// super admins included.
+// it may use. An operator gets the operations face; a super admin also reads
+// the request and response words, the routing page's own; key secrets and
+// session archives are withheld from everyone, super admins included.
 type ConsoleProxy struct {
 	cfg      *Config
 	signer   *Signer
@@ -346,9 +346,11 @@ func (p *ConsoleProxy) upstreamPath(path string) string {
 	return path
 }
 
-// consoleAllowed is the role's path and method table. It is an allow list:
-// an API path this version does not know is refused, so a new endpoint in a
-// newer magpie cannot quietly widen an admin's reach.
+// consoleAllowed is the role's path and method table, in three tiers: what
+// nobody sees (consoleBlocked), what only a super admin reads
+// (confidential), and the operator's own face (operatorAllowed). It is an
+// allow list: an API path this version does not know is refused, so a new
+// endpoint in a newer magpie cannot quietly widen an admin's reach.
 func consoleAllowed(super bool, path, method string, keyID string) bool {
 	get := method == http.MethodGet || method == http.MethodHead
 	if strings.HasPrefix(path, "/console/") {
@@ -359,7 +361,7 @@ func consoleAllowed(super bool, path, method string, keyID string) bool {
 	// them: it reaches no other key, no account and no secret.
 	if keyID != "" {
 		if kind, ok := keyPageRoute(path); ok && get {
-			return kind == keyPageAny || super || ordinaryConsoleAllowed(path, method)
+			return kind == keyPageAny || super || operatorAllowed(path, method)
 		}
 	}
 	if strings.HasPrefix(path, "/wails/") {
@@ -382,7 +384,10 @@ func consoleAllowed(super bool, path, method string, keyID string) bool {
 	if super {
 		return true
 	}
-	return ordinaryConsoleAllowed(path, method)
+	if confidential(path) {
+		return false // the request's own words: a super admin's only
+	}
+	return operatorAllowed(path, method)
 }
 
 const (
@@ -393,7 +398,7 @@ const (
 // keyPageRoute is the key page's data routes (internal/gateway/key_page.go):
 // the bearer is the portal's key for this admin, so the answer is that
 // key's own. A result of keyPageGranted sits between the two roles: an
-// ordinary admin only where the six areas already reach.
+// operator only where the operations face already reaches.
 func keyPageRoute(path string) (int, bool) {
 	switch path {
 	case "/v1/magpie/me", "/v1/magpie/me/usage":
@@ -404,14 +409,12 @@ func keyPageRoute(path string) (int, bool) {
 	return 0, false
 }
 
-// consoleBlocked names the answers that would give away a gateway key or a
-// request or response body. They are refused for every role: the key is the
-// owner's to copy in the portal, and bodies are read in Langfuse.
+// consoleBlocked names the answers refused for every role: gateway keys'
+// values, session archives, the deployment's own secrets. A super admin
+// reads bodies and context, but never these.
 func consoleBlocked(path string) bool {
 	switch path {
-	case "/api/gateway/call", // request and response bodies
-		"/api/usage/requests/content", // a request's body
-		"/api/caller-keys/copy-key",   // any key's full value
+	case "/api/caller-keys/copy-key", // any key's full value
 		"/api/caller-keys/add-key",    // a new key's full value
 		"/api/caller-keys/rotate-key", // the new value, in the answer
 		"/api/gateway/held/reveal",
@@ -419,7 +422,6 @@ func consoleBlocked(path string) bool {
 		"/api/masking/value",
 		"/api/plugin-pages/read",
 		"/api/web-page",
-		"/api/context/text",
 		"/api/settings/search-key", // returns a saved search API key
 		"/api/settings/archive",    // turning body capture on
 		"/api/config/repair":
@@ -445,9 +447,26 @@ func consoleBlocked(path string) bool {
 	return false
 }
 
-// ordinaryConsoleAllowed is the six areas an ordinary admin may read and
-// write: library, providers, gateway, usage overview, masking and settings.
-func ordinaryConsoleAllowed(path, method string) bool {
+// confidential names the request's and reply's own words — bodies and the
+// context they ran in. Operator stops here; a super admin reads on.
+func confidential(path string) bool {
+	switch path {
+	case "/api/gateway/call", // request and response bodies
+		"/api/gateway/trace",          // the routing page's live requests
+		"/api/gateway/history",        // the routing page's per-day requests
+		"/api/gateway/session-titles", // sessions behind the routing rows
+		"/api/usage/requests/content",
+		"/api/context/text":
+		return true
+	}
+	return false
+}
+
+// operatorAllowed is the operations face of the console: providers,
+// routing groups, the gateway, usage overview, masking, plugins and
+// settings. The request's own words are not here: confidential() already
+// stopped them.
+func operatorAllowed(path, method string) bool {
 	get := method == http.MethodGet || method == http.MethodHead
 	switch {
 	case path == "/api/state", path == "/api/upstream", path == "/api/lanes",
@@ -458,14 +477,16 @@ func ordinaryConsoleAllowed(path, method string) bool {
 		return get
 	case path == "/api/set":
 		return method == http.MethodPost
-	case path == "/api/library", strings.HasPrefix(path, "/api/library/"):
-		return true
 	case path == "/api/providers", strings.HasPrefix(path, "/api/providers/"),
 		strings.HasPrefix(path, "/api/provider/"):
 		return true
 	case path == "/api/groups", strings.HasPrefix(path, "/api/groups/"):
 		return true
-	case path == "/api/gateway", strings.HasPrefix(path, "/api/gateway/"):
+	case path == "/api/gateway": // the gateway's own settings; trace/history are confidential
+		return true
+	case path == "/api/gateway/route":
+		return method == http.MethodPost
+	case path == "/api/plugins", strings.HasPrefix(path, "/api/plugins/"), path == "/api/plugin-panels":
 		return true
 	case path == "/api/caller-keys", strings.HasPrefix(path, "/api/caller-keys/"):
 		return true
