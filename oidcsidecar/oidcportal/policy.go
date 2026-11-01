@@ -245,11 +245,11 @@ func (s *PolicyStore) Adopt(id Identity, models []string, budget *BudgetConfig) 
 	})
 }
 
-// EnsureAdmin gives an admin or super admin, as the config names them, an
-// active grant when they have none yet: the console they may open asks as
-// their own gateway key, so the config's admins need one like everyone
-// else. What they already have is left as it is; a disabled or rejected
-// person stays out.
+// EnsureAdmin gives an admin or super admin, as the roles they hold give
+// them, an active grant when they have none yet: the console they may open
+// asks as their own gateway key, so an admin needs one like everyone else.
+// What they already have is left as it is; a disabled or rejected person
+// stays out.
 func (s *PolicyStore) EnsureAdmin(id Identity, models []string, budget *BudgetConfig) (Policy, error) {
 	if pol, ok := s.Get(id.Subject); ok && pol.Status != "" && pol.Status != StatusPending {
 		return pol, nil

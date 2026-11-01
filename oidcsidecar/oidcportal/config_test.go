@@ -1,6 +1,8 @@
 package oidcportal
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -233,5 +235,19 @@ func TestGroupPatternsAreKeyPatterns(t *testing.T) {
 	}
 	if got := c.Groups["team"]; !slices.Equal(got, []string{"a/*", "b/some-model"}) {
 		t.Fatalf("patterns = %v", got)
+	}
+}
+
+func TestConfigHasNoAdminFields(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	path := filepath.Join(t.TempDir(), "oidc.yaml")
+	src := []byte("issuer: http://x\nclient_id: c\nredirect_url: http://x/cb\nlisten: :0\n" +
+		"admins: [a@x]\nsuper_admins: [b@x]\n")
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadConfig(path); err != nil {
+		t.Fatalf("a config with the retired fields loads, ignored: %v", err)
 	}
 }

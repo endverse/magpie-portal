@@ -359,6 +359,7 @@ func TestAdminGetsMagpiesPageWhereAPersonServesTheRest(t *testing.T) {
 	}
 
 	cfg := consoleConfig(t, up.URL)
+	// the role makes boss an admin; team-c is what the console's grant covers
 	boss := &fakeProvider{id: Identity{Subject: "boss", Email: "boss@example.com", Groups: []string{"team-c", RoleOperator}}}
 	ts2, _, c := newTestServer(t, cfg, boss)
 	signIn(t, ts2, c, boss, "/")

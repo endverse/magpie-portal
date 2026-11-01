@@ -66,15 +66,6 @@ type Config struct {
 	// key gets a model list or a monthly cost of its own.
 	Users map[string]UserPolicy `yaml:"users" json:"users"`
 
-	// Admins and AdminGroups say who may open the portal's admin page,
-	// by email or subject, and by OIDC group. SuperAdmins and
-	// SuperAdminGroups are admins who may also read request and response
-	// contents: no content is readable while these are empty.
-	Admins           []string `yaml:"admins" json:"admins"`
-	AdminGroups      []string `yaml:"admin_groups" json:"admin_groups"`
-	SuperAdmins      []string `yaml:"super_admins" json:"super_admins"`
-	SuperAdminGroups []string `yaml:"super_admin_groups" json:"super_admin_groups"`
-
 	// GroupClaim is the ID token claim holding the user's groups; "groups"
 	// by default, or Keycloak's "realm_access.roles" to map realm roles
 	// instead. A dotted path reaches into an object.
