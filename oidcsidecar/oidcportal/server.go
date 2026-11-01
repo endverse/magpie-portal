@@ -540,15 +540,14 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 // ensureAdminKey gives an admin a grant and a key the first time they
 // sign in or open the admin page: the console asks as their own key, so
 // without one every console popup would say it is not allowed. Their
-// groups' providers and the config's budget, unless the portal already
-// holds a standing for them.
+// groups' providers, unless the portal already holds a standing for them.
 func (s *Server) ensureAdminKey(id Identity, pol Policy) (Policy, error) {
 	if !s.cfg.IsAdmin(id) {
 		return pol, nil
 	}
 	// a provisioned deployment grants admins on sight; otherwise one
 	// with no standing yet, or still pending — a role is what they
-	// apply with, as anyone else
+	// apply with
 	grant := s.cfg.ProvidersFor(id.Groups)
 	if *s.cfg.Provision || pol.Status == "" || pol.Status == StatusPending {
 		if _, err := s.policy.EnsureAdmin(id, grant, nil); err != nil {

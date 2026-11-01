@@ -79,15 +79,11 @@ groups:
 # Users whose groups match none. Empty turns them away with no key.
 default_providers: []
 
-# Who may open /admin, by email or subject, and by group.
-admins: [ops@example.com]
-admin_groups: [magpie-admins]
-
-# Super admins are admins who may also open the console's plugin frames.
-# Key values and request/response bodies stay closed to them too; bodies are
-# read in Langfuse.
-super_admins: [owner@example.com]
-super_admin_groups: [magpie-owners]
+# Who may open /admin is not set here: roles live in the identity provider
+# (Keycloak), as the realm roles magpie-operator and magpie-super in the
+# token's groups claim. magpie-super may also open the console's plugin
+# frames; key values and request/response bodies stay closed to both and are
+# read in Langfuse. There is no admin list in this file.
 
 # Off by default: a person signs in, applies, and an admin assigns their
 # models and budget. On grants what groups:/users: say at first sign-in,
@@ -202,8 +198,9 @@ client needs the `groups` claim (a group membership mapper) unless
   (`oidcportal/zh.go`), the holder's own key filled in, and the Copy and
   Rotate buttons working on it. `POST /me/rotate` rotates that key. Its data
   (`/v1/magpie/me`) is asked as the admin's own gateway key, which the
-  portal injects and never passes through from the browser. A person the
-  config names as an admin by email gets that key on first sign-in.
+  portal injects and never passes through from the browser. A person whose
+  token holds `magpie-operator` or `magpie-super` gets that key on first
+  sign-in.
 - `GET /healthz` answers `ok` without touching the provider.
 
 ## The console behind the portal
