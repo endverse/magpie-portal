@@ -247,7 +247,7 @@ func TestSuperAdminConsoleStillHidesKeysAndBodies(t *testing.T) {
 	c := freshClient(ts)
 	signIn(t, ts, c, fp, "/console/")
 
-	for _, path := range []string{"/api/plugins", "/api/gateway/trace", "/api/gateway/call"} {
+	for _, path := range []string{"/api/plugins", "/api/gateway/trace", "/api/gateway/call", "/api/usage/requests/content"} {
 		if resp, body := doConsole(t, c, http.MethodGet, ts.URL+path); resp.StatusCode != http.StatusOK {
 			t.Fatalf("%s: %d %s", path, resp.StatusCode, body)
 		}

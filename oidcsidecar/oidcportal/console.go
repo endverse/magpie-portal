@@ -455,7 +455,7 @@ func confidential(path string) bool {
 		"/api/gateway/trace",          // the routing page's live requests
 		"/api/gateway/history",        // the routing page's per-day requests
 		"/api/gateway/session-titles", // sessions behind the routing rows
-		"/api/usage/requests/content",
+		"/api/usage/requests/content", // a request's body, read from its session's file
 		"/api/context/text":
 		return true
 	}
