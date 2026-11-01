@@ -99,7 +99,6 @@ func TestMain(m *testing.M) {
 func personServer(t *testing.T, up *fetchUpstream) (*httptest.Server, *State, *http.Client) {
 	t.Helper()
 	cfg := consoleConfig(t, up.URL)
-	cfg.Admins = []string{"boss@example.com"}
 	bob := &fakeProvider{id: Identity{Subject: "bob", Email: "bob@example.com", Name: "Bob", Groups: []string{"team-a"}}}
 	ts, state, c := newTestServer(t, cfg, bob)
 	if _, err := state.Update("bob", func(u *User) error {
@@ -360,8 +359,7 @@ func TestAdminGetsMagpiesPageWhereAPersonServesTheRest(t *testing.T) {
 	}
 
 	cfg := consoleConfig(t, up.URL)
-	cfg.Admins = []string{"boss@example.com"}
-	boss := &fakeProvider{id: Identity{Subject: "boss", Email: "boss@example.com", Groups: []string{"team-a"}}}
+	boss := &fakeProvider{id: Identity{Subject: "boss", Email: "boss@example.com", Groups: []string{"team-c", RoleOperator}}}
 	ts2, _, c := newTestServer(t, cfg, boss)
 	signIn(t, ts2, c, boss, "/")
 	resp, body = getAs(t, c, ts2.URL+"/")
@@ -420,7 +418,7 @@ func TestAdminConsoleIsMaggiesOwn(t *testing.T) {
 	// boss's own browser, no one else signed in before: the shared client's
 	// jar would carry bob's session over to boss
 	cfg := consoleConfig(t, up.URL)
-	boss := &fakeProvider{id: Identity{Subject: "boss", Email: "boss@example.com", Groups: []string{"team-a"}}}
+	boss := &fakeProvider{id: Identity{Subject: "boss", Email: "boss@example.com", Groups: []string{"team-a", RoleOperator}}}
 	ts, _, c := newTestServer(t, cfg, boss)
 	signIn(t, ts, c, boss, "/")
 	resp, body := getAs(t, c, ts.URL+"/api/providers")

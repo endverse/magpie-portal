@@ -415,17 +415,17 @@ func normalizeUsers(in map[string]UserPolicy) (map[string]UserPolicy, error) {
 	return out, nil
 }
 
-// IsAdmin says whether the identity may open the admin page: its email or
-// subject is in Admins, or one of its groups is in AdminGroups. A super
-// admin is an admin too. No admin configured admits no one.
+// IsAdmin says whether the identity may open the admin page: the token
+// holds magpie-super or magpie-operator. The config says nothing of it —
+// roles live in the provider, their names here.
 func (c *Config) IsAdmin(id Identity) bool {
-	return c.IsSuperAdmin(id) || c.named(id, c.Admins, c.AdminGroups)
+	return c.IsSuperAdmin(id) || id.HasRole(RoleOperator)
 }
 
 // IsSuperAdmin says whether the identity may do what only a super admin
 // may, such as read a request's and reply's contents.
 func (c *Config) IsSuperAdmin(id Identity) bool {
-	return c.named(id, c.SuperAdmins, c.SuperAdminGroups)
+	return id.HasRole(RoleSuper)
 }
 
 // ConsoleKeyFor is the gateway key the portal asks magpie's console and the
@@ -451,37 +451,6 @@ func (c *Config) KeyIDFor(id Identity) string {
 		return u.KeyID
 	}
 	return ""
-}
-
-// emailNamed says whether an admin: or super_admins: entry names the
-// identity's email or subject, rather than a group's membership.
-func (c *Config) emailNamed(id Identity) bool {
-	return namedPerson(id, c.Admins) || namedPerson(id, c.SuperAdmins)
-}
-
-func (c *Config) named(id Identity, people, groups []string) bool {
-	if namedPerson(id, people) {
-		return true
-	}
-	for _, g := range groups {
-		if id.InGroup(g) {
-			return true
-		}
-	}
-	return false
-}
-
-func namedPerson(id Identity, people []string) bool {
-	for _, a := range people {
-		a = strings.TrimSpace(a)
-		if a == "" {
-			continue
-		}
-		if strings.EqualFold(a, id.Email) || strings.EqualFold(a, id.Subject) {
-			return true
-		}
-	}
-	return false
 }
 
 func normalizeGroups(in map[string][]string) (map[string][]string, error) {

@@ -200,46 +200,22 @@ func TestUsersOverrideTheirGroups(t *testing.T) {
 	}
 }
 
-func TestIsAdmin(t *testing.T) {
-	c := testConfig(t)
-	c.Admins = []string{"boss@example.com"}
-	c.AdminGroups = []string{"ops"}
-	if c.IsAdmin(Identity{Email: "boss@example.com"}) != true {
-		t.Fatal("email admin not admitted")
+func TestRolesDecide(t *testing.T) {
+	c := &Config{} // no admin fields at all
+	super := Identity{Subject: "s", Groups: []string{"magpie-super"}}
+	operator := Identity{Subject: "s", Groups: []string{"magpie-operator"}}
+	plain := Identity{Subject: "s"}
+	if !c.IsAdmin(super) || !c.IsSuperAdmin(super) {
+		t.Fatal("magpie-super is not the super admin")
 	}
-	if c.IsAdmin(Identity{Email: "other@example.com", Groups: []string{"/ops"}}) != true {
-		t.Fatal("group admin not admitted")
+	if !c.IsAdmin(operator) {
+		t.Fatal("magpie-operator is not an admin")
 	}
-	if c.IsAdmin(Identity{Email: "other@example.com"}) != false {
-		t.Fatal("a stranger was admitted")
+	if c.IsSuperAdmin(operator) {
+		t.Fatal("magpie-operator reads as a super admin")
 	}
-	none := &Config{}
-	if none.IsAdmin(Identity{Email: "boss@example.com"}) {
-		t.Fatal("no admin configured admitted someone")
-	}
-}
-
-// A super admin is an admin, and only a super admin may read contents.
-func TestSuperAdminsAreAdmins(t *testing.T) {
-	c := testConfig(t)
-	c.Admins = []string{"boss@example.com"}
-	c.SuperAdmins = []string{"owner@example.com"}
-	c.SuperAdminGroups = []string{"owners"}
-
-	owner := Identity{Email: "owner@example.com"}
-	if !c.IsAdmin(owner) || !c.IsSuperAdmin(owner) {
-		t.Fatal("a super admin is not an admin or not a super admin")
-	}
-	byGroup := Identity{Email: "someone@example.com", Groups: []string{"/owners"}}
-	if !c.IsSuperAdmin(byGroup) {
-		t.Fatal("a super admin group did not admit its member")
-	}
-	boss := Identity{Email: "boss@example.com"}
-	if !c.IsAdmin(boss) || c.IsSuperAdmin(boss) {
-		t.Fatal("an ordinary admin became a super admin")
-	}
-	if c.IsSuperAdmin(Identity{Email: "stranger@example.com"}) {
-		t.Fatal("a stranger is a super admin")
+	if c.IsAdmin(plain) || c.IsSuperAdmin(plain) {
+		t.Fatal("a person with no role reads as an admin")
 	}
 }
 

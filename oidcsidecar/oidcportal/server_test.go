@@ -29,7 +29,6 @@ func serverConfig(t *testing.T) *Config {
 			"team-a": {"a"},
 			"team-c": {"c", "a"},
 		},
-		Admins:        []string{"boss@example.com"},
 		AutoProvision: &on, // these tests predate applications; approval has its own
 	}).Prepare()
 	if err != nil {
@@ -335,7 +334,7 @@ func TestCrossOriginFormsAreRefused(t *testing.T) {
 
 func TestAdminSeesUsersAndOnlyAdminsSeeThePage(t *testing.T) {
 	cfg := serverConfig(t)
-	fp := &fakeProvider{id: Identity{Subject: "boss", Email: "boss@example.com", Groups: []string{"team-c"}}}
+	fp := &fakeProvider{id: Identity{Subject: "boss", Email: "boss@example.com", Groups: []string{"team-c", RoleOperator}}}
 	ts, state, c := newTestServer(t, cfg, fp)
 	if _, err := NewProvisioner(cfg, state).EnsureUser(alice()); err != nil {
 		t.Fatal(err)

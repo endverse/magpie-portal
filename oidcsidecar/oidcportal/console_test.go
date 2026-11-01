@@ -12,12 +12,10 @@ import (
 	"github.com/yetone/magpie/internal/access"
 )
 
-// consoleConfig is serverConfig with a fake magpie console behind it and a
-// super admin beside the ordinary one.
+// consoleConfig is serverConfig with a fake magpie console behind it.
 func consoleConfig(t *testing.T, upstream string) *Config {
 	t.Helper()
 	cfg := serverConfig(t)
-	cfg.SuperAdmins = []string{"root@example.com"}
 	cfg.ConsoleURL = upstream
 	cfg.GatewayURL = upstream // its gateway's route, /v1/magpie/me, is there too
 	cfg.ConsoleWebKey = strings.Repeat("w", 32)
@@ -155,7 +153,7 @@ func doConsole(t *testing.T, c *http.Client, method, url string) (*http.Response
 func TestOrdinaryAdminConsoleIsScoped(t *testing.T) {
 	up := newConsoleUpstream(t)
 	cfg := consoleConfig(t, up.URL)
-	fp := &fakeProvider{id: Identity{Subject: "boss", Email: "boss@example.com", Groups: []string{"team-c"}}}
+	fp := &fakeProvider{id: Identity{Subject: "boss", Email: "boss@example.com", Groups: []string{"team-c", RoleOperator}}}
 	ts, _, _, _ := newConsoleServer(t, cfg, fp)
 	c := freshClient(ts)
 	signIn(t, ts, c, fp, "/console/")
@@ -239,7 +237,7 @@ func TestOrdinaryAdminConsoleIsScoped(t *testing.T) {
 func TestSuperAdminConsoleStillHidesKeysAndBodies(t *testing.T) {
 	up := newConsoleUpstream(t)
 	cfg := consoleConfig(t, up.URL)
-	fp := &fakeProvider{id: Identity{Subject: "root", Email: "root@example.com", Groups: []string{"team-c"}}}
+	fp := &fakeProvider{id: Identity{Subject: "root", Email: "root@example.com", Groups: []string{"team-c", RoleSuper}}}
 	ts, _, _, _ := newConsoleServer(t, cfg, fp)
 	c := freshClient(ts)
 	signIn(t, ts, c, fp, "/console/")
@@ -306,7 +304,7 @@ func TestConsoleRedirectsToTheConsolePath(t *testing.T) {
 func TestTheKeyPageIsTheAdminsOwn(t *testing.T) {
 	up := newConsoleUpstream(t)
 	cfg := consoleConfig(t, up.URL)
-	fp := &fakeProvider{id: Identity{Subject: "boss", Email: "boss@example.com", Username: "boss", Groups: []string{"team-c"}}}
+	fp := &fakeProvider{id: Identity{Subject: "boss", Email: "boss@example.com", Username: "boss", Groups: []string{"team-c", RoleOperator}}}
 	ts, state, _, _ := newConsoleServer(t, cfg, fp)
 	u, err := NewProvisioner(cfg, state).EnsureUser(fp.id)
 	if err != nil {

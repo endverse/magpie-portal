@@ -547,15 +547,11 @@ func (s *Server) ensureAdminKey(id Identity, pol Policy) (Policy, error) {
 	if !s.cfg.IsAdmin(id) {
 		return pol, nil
 	}
-	// an admin the config names by email is trusted by that alone; by group
-	// only until they apply, as anyone else
-	byEmail := s.cfg.emailNamed(id)
+	// an admin the provider gave their role is trusted by that alone, whether
+	// or not the portal provisions anyone else; otherwise only until they
+	// apply, as anyone else
 	grant := s.cfg.ProvidersFor(id.Groups)
-	if *s.cfg.Provision {
-		if _, err := s.policy.EnsureAdmin(id, grant, nil); err != nil {
-			return pol, err
-		}
-	} else if byEmail && (pol.Status == "" || pol.Status == StatusPending) {
+	if *s.cfg.Provision || pol.Status == "" || pol.Status == StatusPending {
 		if _, err := s.policy.EnsureAdmin(id, grant, nil); err != nil {
 			return pol, err
 		}

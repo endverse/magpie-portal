@@ -32,7 +32,6 @@ func approvalConfig(t *testing.T) *Config {
 			"team-a": {"a"},
 			"team-c": {"c", "a"},
 		},
-		Admins:        []string{"boss@example.com"},
 		AutoProvision: &off,
 	}).Prepare()
 	if err != nil {
@@ -78,7 +77,7 @@ func TestApplicationThenApprovalGivesAKey(t *testing.T) {
 	}
 
 	admin := freshClient(ts)
-	fp.id = Identity{Subject: "boss", Email: "boss@example.com", Name: "Boss", Groups: []string{"team-c"}}
+	fp.id = Identity{Subject: "boss", Email: "boss@example.com", Name: "Boss", Groups: []string{"team-c", RoleOperator}}
 	signIn(t, ts, admin, fp, "/admin")
 	resp, err = admin.Get(ts.URL + "/admin")
 	if err != nil {
