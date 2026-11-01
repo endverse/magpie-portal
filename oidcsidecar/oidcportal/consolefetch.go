@@ -171,6 +171,14 @@ func (f *consoleFetch) isAdminRoute(r *http.Request) bool {
 // serveAdmin forwards a request to magpie's console as magpie answers it,
 // signed in with the portal's web key.
 func (f *consoleFetch) serveAdmin(w http.ResponseWriter, r *http.Request) {
+	if !consoleAllowed(f.cfg.IsSuperAdmin(f.who(r)), r.URL.Path, r.Method, "") {
+		if r.Method == http.MethodGet || r.Method == http.MethodHead {
+			writeText(w, http.StatusForbidden, "这个页面不属于你的角色")
+			return
+		}
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "this console path is not allowed for your role"})
+		return
+	}
 	in := r.Clone(r.Context())
 	in.RequestURI = ""
 	in.URL.Scheme, in.URL.Host = f.upstream.Scheme, f.upstream.Host
