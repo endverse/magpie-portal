@@ -167,6 +167,9 @@ func TestProviderExchange(t *testing.T) {
 }
 
 func TestIdentityRoles(t *testing.T) {
+	if RoleSuper != "magpie-super" || RoleOperator != "magpie-operator" {
+		t.Fatalf("role names moved: %q, %q", RoleSuper, RoleOperator)
+	}
 	id := Identity{Subject: "s", Groups: []string{"magpie-super", "/magpie-operator", "team-a"}}
 	if !id.HasRole("magpie-super") {
 		t.Fatal("magpie-super not seen")
@@ -176,6 +179,9 @@ func TestIdentityRoles(t *testing.T) {
 	}
 	if id.HasRole("magpie-none") {
 		t.Fatal("an unheld role says held")
+	}
+	if id.HasRole("") || id.HasRole("/") {
+		t.Fatal("an empty role says held")
 	}
 	plain := Identity{Subject: "s", Groups: []string{"team-a"}}
 	if plain.HasRole("magpie-super") || plain.HasRole("magpie-operator") {

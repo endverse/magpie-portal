@@ -43,8 +43,8 @@ const (
 	RoleOperator = "magpie-operator" // the console's operations, no bodies
 )
 
-// HasRole says whether the identity holds the named built-in role, by the
-// same reading InGroup uses (the provider's spelling, or slashless).
+// HasRole says whether the identity holds the named role, read as a group
+// (the provider's spelling, or slashless).
 func (id Identity) HasRole(role string) bool { return id.InGroup(role) }
 
 // OIDCProvider is the part of an OpenID Connect provider the portal uses: a
