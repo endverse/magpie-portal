@@ -214,6 +214,44 @@ func TestAnAdminsNavMatchesTheirRole(t *testing.T) {
 	}
 }
 
+// The page's first script (consoleboot.go's roleScript) says whose console
+// it is: the document's class is the person's role, which console.css prunes
+// by. node runs it as the page does — after the page has loaded, its timer
+// fired at once — for a super admin, an operator and a person.
+func TestTheRoleClassIsThePersons(t *testing.T) {
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is not installed")
+	}
+	cmd := exec.Command(node, "-e", roleRunner)
+	cmd.Stdin = strings.NewReader(roleScript)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("the role class: %v\n%s", err, out)
+	}
+}
+
+// roleRunner is node's page for roleScript: a document that has loaded, a
+// timer that fires at once, and one pass per person — the class each one's
+// page ends with.
+const roleRunner = `
+const src = require("fs").readFileSync(0, "utf8");
+const pass = (who) => {
+  const ready = [];
+  const html = { className: "page" };
+  globalThis.document = { documentElement: html, addEventListener(t, f) { if (t === "DOMContentLoaded") ready.push(f) } };
+  globalThis.setTimeout = (f) => { f(); return 0 };
+  globalThis.window = { oidcPerson: who };
+  new Function(src)();
+  if (!ready.length) throw new Error("the role script waits on nothing: " + JSON.stringify(who));
+  ready.forEach((f) => f());
+  return html.className.split(" ");
+};
+const want = (who, cls) => { const c = pass(who); if (!c.includes(cls)) throw new Error(JSON.stringify(who) + ": " + JSON.stringify(c)); };
+want({ admin: true, super: true }, "oidc-super");
+want({ admin: true, super: false }, "oidc-operator");
+want({}, "oidc-person");
+`
+
 // adminRunner is node's page for consolepage.go's adminPre: magpie's
 // sidebar with #nav holding every view's button; and the page's first
 // script (consoleboot.go's roleScript), run afterwards, as /boot.js runs it
